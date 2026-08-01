@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反应速度测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        .step {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0ff;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .step.active {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 20px 0;
+            width: 100%;
+        }
+        .btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(118, 75, 162, 0.4);
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            display: none;
+        }
+        .result.show {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result .time {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        .result .label {
+            font-size: 20px;
+            color: #555;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 8px;
+            background: white;
+        }
+        .label.general { color: #ffa500; }
+        .label.nb { color: #00b894; font-weight: bold; }
+        .label.slow { color: #e17055; }
+        .label.too-slow { color: #d63031; font-weight: bold; }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00b894, #667eea);
+            width: 0%;
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+        .status-text {
+            font-size: 16px;
+            color: #888;
+            margin-top: 10px;
+            min-height: 30px;
+        }
+        .reset-btn {
+            background: #e17055;
+            margin-top: 10px;
+        }
+        .reset-btn:hover {
+            background: #d63031;
+        }
+        .step-counter {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ 反应速度测试</h1>
+        
+        <div id="stepDisplay" class="step">准备开始</div>
+        <div class="step-counter" id="stepCounter">步骤 0 / 3</div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <button class="btn" id="actionBtn" onclick="handleAction()">开始测试</button>
+        
+        <div class="status-text" id="statusText">点击按钮开始测试</div>
+        
+        <div class="result" id="result">
+            <div class="time" id="timeDisplay">0.00</div>
+            <div style="color: #888; font-size: 14px;">毫秒</div>
+            <div class="label" id="labelDisplay">等待测试...</div>
+            <button class="btn reset-btn" onclick="resetTest()">🔄 重新测试</button>
+        </div>
+    </div>
+
+    <script>
+        let state = 'idle'; // idle, step1, step2, step3, waiting_input, done
+        let startTime = 0;
+        let step = 0;
+        let timer = null;
+
+        function updateUI(message, stepNum = null) {
+            document.getElementById('stepDisplay').textContent = message;
+            if (stepNum !== null) {
+                document.getElementById('stepCounter').textContent = `步骤 ${stepNum} / 3`;
+                document.getElementById('progressFill').style.width = `${(stepNum / 3) * 100}%`;
+            }
+        }
+
+        function handleAction() {
+            const btn = document.getElementById('actionBtn');
+            
+            switch(state) {
+                case 'idle':
+                    // 开始测试
+                    state = 'step1';
+                    step = 1;
+                    updateUI('1', 1);
+                    btn.textContent = '等待中...';
+                    btn.disabled = true;
+                    document.getElementById('statusText').textContent = '⏳ 等待1秒...';
+                    
+                    setTimeout(() => {
+                        state = 'step2';
+                        step = 2;
+                        updateUI('2', 2);
+                        document.getElementById('statusText').textContent = '⏳ 等待1秒...';
+                        
+                        setTimeout(() => {
+                            state = 'step3';
+                            step = 3;
+                            updateUI('3', 3);
+                            document.getElementById('statusText').textContent = '👆 点击 OK 按钮！';
+                            
+                            // 显示OK按钮
+                            btn.textContent = '✅ 点击 OK';
+                            btn.disabled = false;
+                            startTime = Date.now();
+                            state = 'waiting_input';
+                            document.getElementById('statusText').textContent = '👆 快点点击 OK！';
+                        }, 1000);
+                    }, 1000);
+                    break;
+                    
+                case 'waiting_input':
+                    // 用户点击OK
+                    const endTime = Date.now();
+                    const t = endTime - startTime;
+                    
+                    state = 'done';
+                    btn.textContent = '已完成';
+                    btn.disabled = true;
+                    
+                    // 显示结果
+                    showResult(t);
+                    document.getElementById('statusText').textContent = '✅ 测试完成！';
+                    break;
+            }
+        }
+
+        function showResult(t) {
+            const resultDiv = document.getElementById('result');
+            const timeDisplay = document.getElementById('timeDisplay');
+            const labelDisplay = document.getElementById('labelDisplay');
+            
+            timeDisplay.textContent = t.toFixed(2);
+            resultDiv.classList.add('show');
+            
+            let labelText = '';
+            let labelClass = '';
+            
+            if (t >= 100 && t <= 1000) {
+                labelText = '一般人';
+                labelClass = 'general';
+            } else if (t >= 1 && t <= 100) {
+                labelText = '牛逼之人！';
+                labelClass = 'nb';
+            } else if (t >= 1000 && t <= 10000) {
+                labelText = ' 2般人';
+                labelClass = 'slow';
+            } else if (t >= 100000) {
+                labelText = '3般人，你好好锻炼一下反应力吧！！！！！！！！！';
+                labelClass = 'too-slow';
+            } else {
+                labelText = '反应时间异常，请重新测试';
+                labelClass = 'general';
+            }
+            
+            labelDisplay.textContent = labelText;
+            labelDisplay.className = 'label ' + labelClass;
+        }
+
+        function resetTest() {
+            // 重置所有状态
+            state = 'idle';
+            step = 0;
+            startTime = 0;
+            
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            
+            document.getElementById('actionBtn').textContent = '开始测试';
+            document.getElementById('actionBtn').disabled = false;
+            document.getElementById('result').classList.remove('show');
+            document.getElementById('statusText').textContent = '点击按钮开始测试';
+            updateUI('准备开始', 0);
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('stepCounter').textContent = '步骤 0 / 3';
+        }
+
+        // 键盘支持 - 按 Enter 键触发点击
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const btn = document.getElementById('actionBtn');
+                if (!btn.disabled) {
+                    btn.click();
+                }
+            }
+        });
+
+        // 初始化
+        resetTest();
+    </script>
+</body>
+</html>
