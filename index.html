@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cube World Adventure - 我的世界网页版</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI','Microsoft YaHei',sans-serif;overflow:hidden;background:#1a1a1a}
+        
+        #startScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0a0a2a 0%,#1a0a3a 50%,#0a1a2a 100%);z-index:50000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s,transform 0.6s}
+        #startScreen.hidden{opacity:0;transform:scale(1.1);pointer-events:none}
+        #startScreen .logo{font-size:56px;font-weight:900;color:#ffcc00;text-shadow:0 0 40px rgba(255,204,0,0.6),0 4px 8px rgba(0,0,0,0.5);margin-bottom:10px;letter-spacing:2px;animation:glow 2s ease-in-out infinite alternate}
+        @keyframes glow{from{text-shadow:0 0 20px rgba(255,204,0,0.4),0 4px 8px rgba(0,0,0,0.5)}to{text-shadow:0 0 50px rgba(255,204,0,0.8),0 4px 12px rgba(255,204,0,0.3)}}
+        #startScreen .subtitle{font-size:18px;color:#aaa;margin-bottom:50px;letter-spacing:4px}
+        #startScreen input{width:350px;padding:16px 24px;font-size:20px;border:2px solid #ffcc00;border-radius:12px;background:rgba(255,255,255,0.08);color:white;text-align:center;outline:none;transition:all 0.3s;letter-spacing:2px}
+        #startScreen input:focus{border-color:#ffd700;box-shadow:0 0 30px rgba(255,204,0,0.4);background:rgba(255,255,255,0.12)}
+        #startScreen input::placeholder{color:#666;letter-spacing:1px}
+        #startScreen .btn{width:350px;padding:16px 24px;font-size:20px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;transition:all 0.3s;letter-spacing:2px}
+        #startScreen .btn-create{background:linear-gradient(135deg,#ffcc00,#ffaa00);color:#000;margin-bottom:10px}
+        #startScreen .btn-create:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(255,204,0,0.4)}
+        #startScreen .btn-load{background:rgba(255,255,255,0.1);color:#ffcc00;border:2px solid #ffcc00}
+        #startScreen .btn-load:hover{background:rgba(255,255,255,0.2);transform:translateY(-3px)}
+        #startScreen .hint{color:#666;font-size:13px;margin-top:20px;text-align:center;line-height:1.8}
+        #startScreen .worlds-list{margin-top:20px;max-height:200px;overflow-y:auto;width:350px}
+        #startScreen .world-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,204,0,0.3);border-radius:8px;padding:12px 16px;margin-bottom:8px;cursor:pointer;color:#ddd;transition:all 0.2s;display:flex;justify-content:space-between;align-items:center}
+        #startScreen .world-item:hover{background:rgba(255,204,0,0.15);border-color:#ffcc00}
+        #startScreen .world-item .wn{font-size:16px;font-weight:bold}
+        #startScreen .world-item .wd{font-size:11px;color:#888}
+        #startScreen .world-item .del-btn{background:#ff4444;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px}
+        #startScreen .world-item .del-btn:hover{background:#ff6666}
+        #startScreen .error{color:#ff4444;font-size:14px;margin-top:8px;min-height:20px}
+
+        #gameUI{display:none}
+        #gameUI.active{display:block}
+        #crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;z-index:1000;pointer-events:none}
+        .crosshair-line{position:absolute;background-color:white;box-shadow:0 0 4px rgba(0,0,0,0.5)}
+        .crosshair-line.horizontal{width:20px;height:2px;top:9px;left:0}
+        .crosshair-line.vertical{width:2px;height:20px;left:9px;top:0}
+        .crosshair-dot{position:absolute;width:4px;height:4px;background-color:white;border-radius:50%;top:8px;left:8px;box-shadow:0 0 4px rgba(0,0,0,0.5)}
+        .crosshair-line.targeting{background-color:#ffcc00}
+        .crosshair-dot.targeting{background-color:#ffcc00}
+        #timeIndicator{position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.7);color:white;padding:8px 15px;border-radius:20px;font-size:14px;z-index:100;display:flex;align-items:center;gap:10px;border:1px solid #ffcc00}
+        .time-icon{font-size:18px}.time-bar{width:100px;height:10px;background:rgba(255,255,255,0.2);border-radius:5px;overflow:hidden}
+        .time-progress{height:100%;width:50%;background:linear-gradient(90deg,#ffaa00,#ffcc00);border-radius:5px;transition:width 0.1s linear}
+        .time-text{font-weight:bold;min-width:45px;text-align:center}
+        #info{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.7);color:white;padding:10px;border-radius:5px;font-size:14px;z-index:100}
+
+        /* 快捷栏 */
+        #hotbar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:2px;z-index:100}
+        #hotbar .hotbar-slot{width:48px;height:48px;background:rgba(0,0,0,0.5);border:2px solid #555;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px}
+        #hotbar .hotbar-slot.selected{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,0.5);background:rgba(255,255,255,0.15)}
+        #hotbar .hotbar-slot .item-count{position:absolute;bottom:1px;right:3px;font-size:11px;color:white;text-shadow:1px 1px 0 #000}
+        #hotbar .hotbar-slot .slot-num{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:#aaa}
+
+        /* 物品栏面板 */
+        #inventoryPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);color:white;z-index:2000;display:none;border:3px solid #555;border-radius:4px;box-shadow:0 0 60px rgba(0,0,0,0.9)}
+        #inventoryPanel .inv-title{background:rgba(0,0,0,0.8);color:#ddd;padding:8px 16px;font-size:14px;text-align:center;border-bottom:2px solid #444}
+        #inventoryPanel .inv-content{display:flex;gap:20px;padding:15px}
+        #inventoryPanel .inv-main{display:flex;flex-direction:column;align-items:center}
+        #inventoryPanel .inv-grid{display:grid;grid-template-columns:repeat(9,48px);gap:2px}
+        #inventoryPanel .inv-slot{width:48px;height:48px;background:rgba(0,0,0,0.4);border:2px solid #555;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;position:relative;user-select:none}
+        #inventoryPanel .inv-slot:hover{border-color:#aaa;background:rgba(255,255,255,0.1)}
+        #inventoryPanel .inv-slot .item-count{position:absolute;bottom:1px;right:3px;font-size:11px;color:white;text-shadow:1px 1px 0 #000}
+        #inventoryPanel .inv-side{display:flex;flex-direction:column;gap:8px}
+        #inventoryPanel .craft-area{background:rgba(0,0,0,0.3);padding:10px;border-radius:4px}
+        #inventoryPanel .craft-label{font-size:11px;color:#aaa;text-align:center;margin-bottom:6px}
+        #inventoryPanel .craft-grid{display:grid;grid-template-columns:repeat(2,48px);gap:2px;margin:0 auto 8px}
+        #inventoryPanel .craft-slot{width:48px;height:48px;background:rgba(0,0,0,0.4);border:2px solid #555;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;position:relative}
+        #inventoryPanel .craft-slot:hover{border-color:#aaa}
+        #inventoryPanel .craft-result{width:48px;height:48px;background:rgba(0,0,0,0.4);border:3px solid #ffcc00;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;margin:0 auto}
+        #inventoryPanel .craft-result:hover{background:rgba(255,204,0,0.15)}
+        #inventoryPanel .armor-area{background:rgba(0,0,0,0.3);padding:10px;border-radius:4px}
+        #inventoryPanel .armor-slots{display:flex;flex-direction:column;gap:2px;align-items:center}
+        #inventoryPanel .armor-slot{width:48px;height:48px;background:rgba(0,0,0,0.4);border:2px solid #555;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer}
+        #inventoryPanel .armor-slot:hover{border-color:#aaa}
+        #inventoryPanel .inv-close{position:absolute;top:8px;right:12px;color:#ff4444;cursor:pointer;font-size:20px;font-weight:bold}
+        #inventoryPanel .inv-close:hover{color:#ff6666}
+
+        /* 拖拽物品 */
+        #dragItem{position:fixed;pointer-events:none;z-index:3000;display:none;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:rgba(0,0,0,0.6);border:2px solid #ffcc00;border-radius:4px;transform:translate(-50%,-50%)}
+
+        #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;color:white;font-size:24px;z-index:10000;transition:opacity 0.5s}
+        #loadingStatus{font-size:14px;margin-top:10px;color:#aaa}
+        #fps{position:absolute;top:10px;right:120px;background:rgba(0,0,0,0.7);color:#0ff;padding:5px 10px;border-radius:5px;font-size:14px;z-index:100}
+        #damageIndicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:red;font-size:48px;font-weight:bold;text-shadow:0 0 10px rgba(255,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:1000}
+        #clickHint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:18px;background:rgba(0,0,0,0.6);padding:15px 25px;border-radius:10px;z-index:2000;text-align:center;pointer-events:none}
+        .time-control{position:absolute;bottom:80px;right:10px;background:rgba(0,0,0,0.7);color:white;padding:5px 10px;border-radius:5px;font-size:12px;z-index:100;cursor:pointer;border:1px solid #ffcc00}
+        .time-control:hover{background:#ffcc00;color:#000}
+        #modeIndicator{position:absolute;top:60px;left:10px;background:rgba(0,0,0,0.8);color:#ffcc00;padding:6px 12px;border-radius:20px;font-size:16px;font-weight:bold;z-index:100;border:2px solid #ffcc00}
+        .mode-creative{color:#00ff00}.mode-survival{color:#ff4444}
+        #worldNameDisplay{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#ffcc00;padding:6px 16px;border-radius:15px;font-size:13px;z-index:100;border:1px solid #ffcc00}
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <div class="logo">Cube World</div>
+        <div class="subtitle">Adventure Awaits</div>
+        <input type="text" id="worldNameInput" placeholder="输入世界名称..." maxlength="30" autocomplete="off">
+        <div class="error" id="errorMsg"></div>
+        <button class="btn btn-create" onclick="window.startGame()">🌍 创建新世界</button>
+        <button class="btn btn-load" onclick="window.toggleWorldsList()">📂 加载已有世界</button>
+        <div class="worlds-list" id="worldsList" style="display:none"></div>
+        <div class="hint">💡 关闭页面时自动下载存档文件 | 也可拖拽文件到此窗口导入</div>
+    </div>
+
+    <div id="loading" style="display:none"><div>生成世界中...</div><div id="loadingStatus">正在加载...</div></div>
+
+    <div id="gameUI">
+        <div id="damageIndicator"></div>
+        <div id="worldNameDisplay"></div>
+        <div id="clickHint">🖱️ 点击屏幕开始游戏</div>
+        <div id="crosshair-container"><div id="crosshair"><div class="crosshair-line horizontal" id="crosshair-h"></div><div class="crosshair-line vertical" id="crosshair-v"></div><div class="crosshair-dot" id="crosshair-dot"></div></div></div>
+        <div id="timeIndicator"><span class="time-icon" id="timeIcon">☀️</span><div class="time-bar"><div class="time-progress" id="timeProgress" style="width:50%"></div></div><span class="time-text" id="timeText">中午</span></div>
+        <div class="time-control" onclick="window.game&&window.game.toggleDayNight()">⏱️ 切换昼夜</div>
+        <div id="modeIndicator">🎮 模式: <span id="modeText" class="mode-survival">生存</span> (T键)</div>
+        <div id="info"><div>❤️ <span id="health">10</span> | 🍗 <span id="hunger">10</span></div><div>生物: <span id="mobCount">0</span> | 云朵: <span id="cloudCount">16</span></div></div>
+        
+        <div id="hotbar"></div>
+        <div id="dragItem"></div>
+
+        <div id="inventoryPanel">
+            <div class="inv-title">📦 物品栏<span class="inv-close" onclick="window.game&&window.game.closeInventory()">✕</span></div>
+            <div class="inv-content">
+                <div class="inv-main">
+                    <div class="inv-grid" id="invGrid"></div>
+                    <div style="height:4px"></div>
+                    <div class="inv-grid" id="hotbarGrid"></div>
+                </div>
+                <div class="inv-side">
+                    <div class="craft-area">
+                        <div class="craft-label">合成</div>
+                        <div class="craft-grid" id="craft2x2"></div>
+                        <div class="craft-result" id="craftOutput">→</div>
+                    </div>
+                    <div class="armor-area">
+                        <div class="craft-label">装备</div>
+                        <div class="armor-slots" id="armorSlots"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="fps">FPS: <span id="fpsValue">0</span></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/PointerLockControls.js"></script>
+    <script>
+    window.worldName='';
+    window.getSavedWorlds=function(){const w=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('mc3d_world_')){const d=JSON.parse(localStorage.getItem(k));w.push({name:k.replace('mc3d_world_',''),date:d.ts?new Date(d.ts*1000).toLocaleString():'未知',key:k});}}return w.sort((a,b)=>b.date.localeCompare(a.date));};
+    window.toggleWorldsList=function(){const l=document.getElementById('worldsList');if(l.style.display==='none'){const w=window.getSavedWorlds();l.innerHTML=w.length===0?'<div style="color:#666;text-align:center;padding:20px">暂无存档</div>':w.map(w=>`<div class="world-item" onclick="window.loadWorld('${w.name}')"><div><div class="wn">🌍 ${w.name}</div><div class="wd">${w.date}</div></div><button class="del-btn" onclick="event.stopPropagation();window.deleteWorld('${w.name}')">删除</button></div>`).join('');l.style.display='block';}else{l.style.display='none';}};
+    window.loadWorldFromFile=function(f){const r=new FileReader();r.onload=function(e){try{window.worldName=f.name.replace('.Cube World Adventure','');window.launchGame(JSON.parse(e.target.result));}catch(err){document.getElementById('errorMsg').textContent='文件格式错误';}};r.readAsText(f);};
+    window.loadWorld=function(n){const k='mc3d_world_'+n;const d=localStorage.getItem(k);if(d){window.worldName=n;window.launchGame(JSON.parse(d));}};
+    window.deleteWorld=function(n){if(confirm('确定删除世界 "'+n+'" 吗？')){const k='mc3d_world_'+n;localStorage.removeItem(k);localStorage.removeItem(k+'_core');localStorage.removeItem(k+'_bc');localStorage.removeItem(k+'_w');window.toggleWorldsList();window.toggleWorldsList();}};
+    window.startGame=function(){const i=document.getElementById('worldNameInput');const n=i.value.trim();if(!n||n.length<2){document.getElementById('errorMsg').textContent='⚠️ 世界名称至少2个字符';i.focus();return;}window.worldName=n;window.launchGame(null);};
+    window.launchGame=function(sd){document.getElementById('startScreen').classList.add('hidden');document.getElementById('loading').style.display='flex';document.getElementById('gameUI').classList.add('active');document.getElementById('worldNameDisplay').textContent='🌍 '+window.worldName;setTimeout(()=>{if(!window.game)window.game=new MinecraftGame(sd);},100);};
+    document.addEventListener('dragover',(e)=>{e.preventDefault();});
+    document.addEventListener('drop',(e)=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.Cube World Adventure'))window.loadWorldFromFile(f);});
+    document.getElementById('worldNameInput').addEventListener('keydown',(e)=>{if(e.key==='Enter')window.startGame();});
+
+    class MinecraftGame {
+        constructor(sd){
+            this.worldName=window.worldName||'未命名';
+            this.saveKey='mc3d_world_'+this.worldName;
+            this.scene=new THREE.Scene();
+            this.camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,15);
+            this.renderer=new THREE.WebGLRenderer({antialias:true});
+            this.controls=null;
+            this.blocks=new Map();this.mobs=[];this.dropItems=[];this.clouds=[];
+            this.worldSize=40;this.selectedSlot=0;
+            this.sharedMaterials={};this.shadowsEnabled=true;
+            this.waterFlowTimer=0;this.waterFlowInterval=20;
+            this.inventoryOpen=false;this.isTargeting=false;this.survivalMode=true;
+            this.timeOfDay=0.5;this.dayLength=600;this.lastTime=performance.now()/1000;
+            this.ambientLight=null;this.directionalLight=null;
+            this.sunPosition=new THREE.Vector3(10,20,5);
+            this.daySkyColor=new THREE.Color(0x87CEEB);this.nightSkyColor=new THREE.Color(0x0a0a2a);
+            this.sunriseSkyColor=new THREE.Color(0xff9966);this.sunsetSkyColor=new THREE.Color(0xff6633);
+            this.health=10;this.hunger=10;this.fallDistance=0;this.minFallDamageDistance=3;
+            this.blockTypes=['grass','dirt','stone','wood','leaf','sand','coal','iron','gold','diamond','plank','stick','cobblestone','wood_pickaxe','stone_pickaxe','iron_pickaxe','gold_pickaxe','diamond_pickaxe'];
+            this.blockTypeMap={};this.blockTypes.forEach((t,i)=>{this.blockTypeMap[t]=i;});
+
+            // 36格物品栏 + 4格装备栏 + 4格合成栏
+            this.invSlots=[];for(let i=0;i<36;i++)this.invSlots.push(null); // 0-8快捷栏, 9-35背包
+            this.armorSlots=[null,null,null,null]; // 头,胸,腿,鞋
+            this.craftSlots=[null,null,null,null]; // 2x2合成格
+            
+            // 拖拽系统
+            this.cursorItem=null;
+            this.dragDiv=document.getElementById('dragItem');
+
+            this.recipes={
+                plank:{pattern:[['wood',null],[null,null]],result:{type:'plank',count:4}},
+                stick:{pattern:[['plank',null],['plank',null]],result:{type:'stick',count:4}},
+                wood_pickaxe:{pattern:[['plank','plank'],['plank','stick']],result:{type:'wood_pickaxe',count:1}},
+                stone_pickaxe:{pattern:[['cobblestone','cobblestone'],['cobblestone','stick']],result:{type:'stone_pickaxe',count:1}},
+                iron_pickaxe:{pattern:[['iron','iron'],['iron','stick']],result:{type:'iron_pickaxe',count:1}},
+                gold_pickaxe:{pattern:[['gold','gold'],['gold','stick']],result:{type:'gold_pickaxe',count:1}},
+                diamond_pickaxe:{pattern:[['diamond','diamond'],['diamond','stick']],result:{type:'diamond_pickaxe',count:1}},
+                cobblestone:{pattern:[['stone','stone'],['stone','stone']],result:{type:'cobblestone',count:1}}
+            };
+
+            this.player={position:new THREE.Vector3(0,18,0),velocity:new THREE.Vector3(),speed:0.12,onGround:false,inWater:false};
+            this.keys={};this.frameCount=0;this.lastFpsUpdate=performance.now();
+            this.texturesLoaded=0;this.totalTextures=10;this.worldReady=false;this.allTexturesReady=false;
+            this.saveData=sd;this.init();
+        }
+
+        hideLoading(){const l=document.getElementById('loading');if(l){l.style.opacity='0';setTimeout(()=>{l.style.display='none';},500);}}
+        checkAllReady(){if(this.worldReady&&this.allTexturesReady){this.hideLoading();if(this.saveData){this.applySaveData(this.saveData);}else{this.loadGame();}}}
+
+        // ===== 物品栏系统 =====
+        getItemIcon(type){
+            const icons={grass:'🟩',dirt:'🟫',stone:'🪨',wood:'🟤',leaf:'🍃',sand:'🟨',coal:'⚫',iron:'⬜',gold:'🟡',diamond:'🩵',plank:'🟧',stick:'🥢',cobblestone:'🪨',wood_pickaxe:'⛏️',stone_pickaxe:'⛏️',iron_pickaxe:'⛏️',gold_pickaxe:'⛏️',diamond_pickaxe:'⛏️'};
+            return icons[type]||'📦';
+        }
+
+        getItemName(type){const n={grass:'草方块',dirt:'泥土',stone:'石头',wood:'原木',leaf:'树叶',sand:'沙子',coal:'煤炭',iron:'铁矿石',gold:'金矿石',diamond:'钻石',plank:'木板',stick:'木棍',cobblestone:'圆石',wood_pickaxe:'木镐',stone_pickaxe:'石镐',iron_pickaxe:'铁镐',gold_pickaxe:'金镐',diamond_pickaxe:'钻石镐'};return n[type]||type;}
+
+        // 添加物品到背包
+        addItem(type,count=1){
+            if(!this.blockTypeMap.hasOwnProperty(type))return false;
+            const maxStack=64;
+            let remaining=count;
+            // 先尝试堆叠已有物品
+            for(let i=0;i<36;i++){
+                if(this.invSlots[i]&&this.invSlots[i].type===type&&this.invSlots[i].count<maxStack){
+                    const space=maxStack-this.invSlots[i].count;
+                    const add=Math.min(space,remaining);
+                    this.invSlots[i].count+=add;
+                    remaining-=add;
+                    if(remaining<=0)break;
+                }
+            }
+            // 新格子
+            while(remaining>0){
+                const idx=this.invSlots.findIndex(s=>s===null);
+                if(idx===-1)break;
+                const add=Math.min(maxStack,remaining);
+                this.invSlots[idx]={type,count:add};
+                remaining-=add;
+            }
+            this.updateHotbar();this.updateInventoryUI();
+            return remaining===0;
+        }
+
+        // 从背包移除物品
+        removeItem(type,count=1){
+            let remaining=count;
+            for(let i=0;i<36;i++){
+                if(this.invSlots[i]&&this.invSlots[i].type===type){
+                    const rem=Math.min(this.invSlots[i].count,remaining);
+                    this.invSlots[i].count-=rem;
+                    remaining-=rem;
+                    if(this.invSlots[i].count<=0)this.invSlots[i]=null;
+                    if(remaining<=0)break;
+                }
+            }
+            this.updateHotbar();this.updateInventoryUI();
+            return remaining===0;
+        }
+
+        // 获取快捷栏选中物品
+        getSelectedItem(){return this.invSlots[this.selectedSlot];}
+        getSelectedType(){const s=this.getSelectedItem();return s?s.type:null;}
+
+        // 更新快捷栏UI
+        updateHotbar(){
+            const hb=document.getElementById('hotbar');
+            if(!hb)return;hb.innerHTML='';
+            for(let i=0;i<9;i++){
+                const slot=document.createElement('div');
+                slot.className='hotbar-slot'+(i===this.selectedSlot?' selected':'');
+                slot.innerHTML=`<span class="slot-num">${i+1}</span>`;
+                if(this.invSlots[i]){
+                    slot.innerHTML+=`<span style="font-size:26px">${this.getItemIcon(this.invSlots[i].type)}</span>`;
+                    if(this.invSlots[i].count>1)slot.innerHTML+=`<span class="item-count">${this.invSlots[i].count}</span>`;
+                }
+                const idx=i;
+                slot.addEventListener('click',()=>{this.selectedSlot=idx;this.updateHotbar();});
+                hb.appendChild(slot);
+            }
+        }
+
+        // 更新物品栏面板
+        updateInventoryUI(){
+            if(!this.inventoryOpen)return;
+            const grid=document.getElementById('invGrid');
+            const hGrid=document.getElementById('hotbarGrid');
+            const craft=document.getElementById('craft2x2');
+            const armor=document.getElementById('armorSlots');
+            const output=document.getElementById('craftOutput');
+            
+            const makeSlot=(item,clickHandler)=>{
+                const s=document.createElement('div');s.className='inv-slot';
+                if(item){s.innerHTML=`<span>${this.getItemIcon(item.type)}</span>`;if(item.count>1)s.innerHTML+=`<span class="item-count">${item.count}</span>`;}
+                if(clickHandler)s.addEventListener('click',(e)=>clickHandler(e,s));
+                return s;
+            };
+
+            // 背包格子(9-35)
+            grid.innerHTML='';for(let i=9;i<36;i++){const idx=i;const s=makeSlot(this.invSlots[i],(e)=>this.slotClick(idx,e));grid.appendChild(s);}
+            // 快捷栏格子(0-8)
+            hGrid.innerHTML='';for(let i=0;i<9;i++){const idx=i;const s=makeSlot(this.invSlots[i],(e)=>this.slotClick(idx,e));s.style.borderColor=i===this.selectedSlot?'#fff':'#555';hGrid.appendChild(s);}
+            // 合成格(2x2)
+            craft.innerHTML='';for(let i=0;i<4;i++){const idx=i;const s=document.createElement('div');s.className='craft-slot';if(this.craftSlots[i]){s.innerHTML=`<span>${this.getItemIcon(this.craftSlots[i].type)}</span>`;if(this.craftSlots[i].count>1)s.innerHTML+=`<span class="item-count">${this.craftSlots[i].count}</span>`;}s.addEventListener('click',(e)=>this.craftSlotClick(idx,e));craft.appendChild(s);}
+            // 合成结果
+            const res=this.checkRecipe();output.innerHTML=res?`<span>${this.getItemIcon(res.type)}</span><span class="item-count">${res.count}</span>`:'→';
+            if(res)output.onclick=()=>this.craftOutputClick();
+            // 装备栏
+            armor.innerHTML='';const armorIcons=['头盔','胸甲','裤子','靴子'];for(let i=0;i<4;i++){const s=document.createElement('div');s.className='armor-slot';s.innerHTML=this.armorSlots[i]?this.getItemIcon(this.armorSlots[i].type):armorIcons[i];armor.appendChild(s);}
+        }
+
+        // 格子点击
+        slotClick(idx,e){
+            const item=this.invSlots[idx];
+            if(this.cursorItem){
+                if(item&&item.type===this.cursorItem.type&&item.count<64){
+                    const space=64-item.count;const add=Math.min(space,this.cursorItem.count);
+                    item.count+=add;this.cursorItem.count-=add;
+                    if(this.cursorItem.count<=0)this.cursorItem=null;
+                }else{
+                    this.invSlots[idx]=this.cursorItem;this.cursorItem=item;
+                }
+            }else if(item){
+                if(e.shiftKey){this.cursorItem=item;this.invSlots[idx]=null;}else{
+                    const half=Math.ceil(item.count/2);if(item.count>1&&e.button===2){this.cursorItem={type:item.type,count:half};item.count-=half;}else{this.cursorItem=item;this.invSlots[idx]=null;}
+                }
+            }
+            this.updateHotbar();this.updateInventoryUI();
+            if(this.cursorItem){this.dragDiv.style.display='flex';this.dragDiv.innerHTML=`<span>${this.getItemIcon(this.cursorItem.type)}</span><span style="font-size:11px;color:white">${this.cursorItem.count}</span>`;}
+            else this.dragDiv.style.display='none';
+        }
+
+        craftSlotClick(idx,e){
+            const item=this.craftSlots[idx];
+            if(this.cursorItem){
+                if(item&&item.type===this.cursorItem.type){item.count+=this.cursorItem.count;this.cursorItem=null;}else{this.craftSlots[idx]=this.cursorItem;if(item)this.cursorItem=item;else this.cursorItem=null;}
+            }else if(item){this.cursorItem=item;this.craftSlots[idx]=null;}
+            this.updateHotbar();this.updateInventoryUI();
+            if(this.cursorItem){this.dragDiv.style.display='flex';this.dragDiv.innerHTML=`<span>${this.getItemIcon(this.cursorItem.type)}</span><span style="font-size:11px;color:white">${this.cursorItem.count}</span>`;}
+            else this.dragDiv.style.display='none';
+        }
+
+        craftOutputClick(){
+            const res=this.checkRecipe();
+            if(!res)return;
+            if(!this.addItem(res.type,res.count))return;
+            for(let i=0;i<4;i++){if(this.craftSlots[i]){this.craftSlots[i].count--;if(this.craftSlots[i].count<=0)this.craftSlots[i]=null;}}
+            this.updateHotbar();this.updateInventoryUI();
+        }
+
+        checkRecipe(){
+            for(let[name,recipe]of Object.entries(this.recipes)){
+                let match=true;
+                for(let r=0;r<2;r++)for(let c=0;c<2;c++){
+                    const req=recipe.pattern[r]?recipe.pattern[r][c]:null;
+                    const slot=this.craftSlots[r*2+c];
+                    if((req===null&&slot!==null)||(req!==null&&(!slot||slot.type!==req))){match=false;break;}
+                }
+                if(match)return recipe.result;
+            }
+            return null;
+        }
+
+        // 打开/关闭物品栏
+        toggleInventory(){
+            if(this.inventoryOpen)this.closeInventory();else this.openInventory();
+        }
+        openInventory(){
+            this.inventoryOpen=true;
+            document.getElementById('inventoryPanel').style.display='block';
+            if(this.controls&&this.controls.isLocked){try{this.controls.unlock();}catch(e){}}
+            this.cursorItem=null;this.dragDiv.style.display='none';
+            this.updateHotbar();this.updateInventoryUI();
+        }
+        closeInventory(){
+            this.inventoryOpen=false;
+            document.getElementById('inventoryPanel').style.display='none';
+            if(this.cursorItem){this.addItem(this.cursorItem.type,this.cursorItem.count);this.cursorItem=null;}
+            this.dragDiv.style.display='none';
+        }
+
+        // ===== 存档 =====
+        buildSaveData(){const b=[],w=[];for(let[k,bl]of this.blocks.entries()){const u=bl.userData;const t=this.blockTypeMap[u.type];if(t===undefined)continue;if(u.type==='water')w.push(u.x,u.y,u.z);else b.push(u.x,u.y,u.z,t);}
+        return{v:10,name:this.worldName,p:[Math.round(this.player.position.x*100)/100,Math.round(this.player.position.y*100)/100,Math.round(this.player.position.z*100)/100],inv:this.invSlots.filter(s=>s!==null),hp:Math.round(this.health*10)/10,hu:Math.round(this.hunger*10)/10,tod:Math.round(this.timeOfDay*10000)/10000,sm:this.survivalMode?1:0,sbt:this.selectedSlot,se:this.shadowsEnabled?1:0,b:b,w:w,wsz:this.worldSize,ts:Math.floor(Date.now()/1000)};}
+        applySaveData(d){if(!d||!d.p)return false;this.player.position.set(d.p[0],d.p[1],d.p[2]);this.camera.position.copy(this.player.position);
+        this.invSlots=[];for(let i=0;i<36;i++)this.invSlots.push(null);if(d.inv)for(let i=0;i<Math.min(d.inv.length,36);i++)this.invSlots[i]=d.inv[i]?{...d.inv[i]}:null;
+        this.selectedSlot=d.sbt||0;this.health=d.hp??10;this.hunger=d.hu??10;this.timeOfDay=d.tod??0.5;this.survivalMode=(d.sm??1)===1;this.shadowsEnabled=(d.se??1)===1;
+        for(let[k,bl]of this.blocks.entries())this.scene.remove(bl);this.blocks.clear();
+        if(d.b&&d.b.length>0){for(let i=0;i<d.b.length;i+=4){this.addBlock(d.b[i],d.b[i+1],d.b[i+2],this.blockTypes[d.b[i+3]]||'stone',false);}}
+        if(d.w&&d.w.length>0){for(let i=0;i<d.w.length;i+=3){this.createWaterBlock(d.w[i],d.w[i+1],d.w[i+2]);}}
+        if(this.renderer)this.renderer.shadowMap.enabled=this.shadowsEnabled;
+        document.getElementById('health').textContent=Math.floor(this.health*10)/10;document.getElementById('hunger').textContent=Math.floor(this.hunger*10)/10;
+        const mt=document.getElementById('modeText');if(mt){mt.textContent=this.survivalMode?'生存':'创造';mt.className=this.survivalMode?'mode-survival':'mode-creative';}
+        this.updateTimeOfDay();this.updateHotbar();this.updateInventoryUI();return true;}
+        saveGame(){try{const d=this.buildSaveData();const j=JSON.stringify(d);try{localStorage.setItem(this.saveKey,j);}catch(e){if(e.name==='QuotaExceededError')this.saveGameSplit(d);}this.downloadSaveFile(j);}catch(e){}}
+        saveGameSplit(d){try{const c={...d};const bd=c.b,wd=c.w;delete c.b;delete c.w;localStorage.setItem(this.saveKey+'_core',JSON.stringify(c));if(bd&&bd.length>0){const bj=JSON.stringify(bd);const cs=40000;const n=Math.ceil(bj.length/cs);localStorage.setItem(this.saveKey+'_bc',n.toString());for(let i=0;i<n;i++)localStorage.setItem(this.saveKey+'_b'+i,bj.substring(i*cs,(i+1)*cs));}if(wd&&wd.length>0)localStorage.setItem(this.saveKey+'_w',JSON.stringify(wd));}catch(e){}}
+        downloadSaveFile(jsonStr){try{const blob=new Blob([jsonStr],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=this.worldName+'.Cube World Adventure';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}catch(e){}}
+        loadGame(){try{const j=localStorage.getItem(this.saveKey);if(j){this.applySaveData(JSON.parse(j));return;}const c=localStorage.getItem(this.saveKey+'_core');if(c){const d=JSON.parse(c);const nc=localStorage.getItem(this.saveKey+'_bc');if(nc){let bj='';for(let i=0;i<parseInt(nc);i++){const ch=localStorage.getItem(this.saveKey+'_b'+i);if(ch)bj+=ch;}d.b=bj?JSON.parse(bj):[];}else d.b=[];const w=localStorage.getItem(this.saveKey+'_w');d.w=w?JSON.parse(w):[];this.applySaveData(d);return;}}catch(e){}}
+
+        toggleGameMode(){this.survivalMode=!this.survivalMode;const m=document.getElementById('modeText');if(this.survivalMode){m.textContent='生存';m.className='mode-survival';this.health=10;this.hunger=10;document.getElementById('health').textContent=this.health;document.getElementById('hunger').textContent=this.hunger;}else{m.textContent='创造';m.className='mode-creative';for(let t of this.blockTypes){if(this.blockTypeMap.hasOwnProperty(t)){while(this.addItem(t,64));}}this.updateHotbar();this.updateInventoryUI();}}
+        toggleShadows(){this.shadowsEnabled=!this.shadowsEnabled;if(this.renderer)this.renderer.shadowMap.enabled=this.shadowsEnabled;for(let[k,b]of this.blocks.entries()){if(b.userData.type!=='water')b.castShadow=this.shadowsEnabled;}if(this.directionalLight)this.directionalLight.castShadow=this.shadowsEnabled;for(let m of this.mobs){m.group.traverse(c=>{if(c.isMesh)c.castShadow=this.shadowsEnabled;});}}
+
+        updateTimeOfDay(){const n=performance.now()/1000;const d=n-this.lastTime;this.lastTime=n;this.timeOfDay+=(d/this.dayLength);if(this.timeOfDay>1)this.timeOfDay-=1;const li=0.3+0.7*Math.sin(this.timeOfDay*Math.PI);if(this.ambientLight)this.ambientLight.intensity=0.2+li*0.4;if(this.directionalLight){this.directionalLight.intensity=li*0.8;const a=this.timeOfDay*Math.PI*2;this.sunPosition.x=Math.cos(a)*30;this.sunPosition.y=Math.sin(a)*30+10;this.directionalLight.position.copy(this.sunPosition);}let sc;if(this.timeOfDay<0.25)sc=this.nightSkyColor.clone().lerp(this.sunriseSkyColor,this.timeOfDay/0.25);else if(this.timeOfDay<0.5)sc=this.sunriseSkyColor.clone().lerp(this.daySkyColor,(this.timeOfDay-0.25)/0.25);else if(this.timeOfDay<0.75)sc=this.daySkyColor.clone().lerp(this.sunsetSkyColor,(this.timeOfDay-0.5)/0.25);else sc=this.sunsetSkyColor.clone().lerp(this.nightSkyColor,(this.timeOfDay-0.75)/0.25);this.scene.background=sc;this.updateTimeUI();}
+        updateTimeUI(){const p=document.getElementById('timeProgress'),t=document.getElementById('timeText'),i=document.getElementById('timeIcon');if(p)p.style.width=(this.timeOfDay*100)+'%';if(!t)return;if(this.timeOfDay<0.2){t.textContent='深夜';if(i)i.textContent='🌙';}else if(this.timeOfDay<0.3){t.textContent='黎明';if(i)i.textContent='🌅';}else if(this.timeOfDay<0.45){t.textContent='早晨';if(i)i.textContent='☀️';}else if(this.timeOfDay<0.55){t.textContent='正午';if(i)i.textContent='☀️';}else if(this.timeOfDay<0.7){t.textContent='下午';if(i)i.textContent='☀️';}else if(this.timeOfDay<0.8){t.textContent='黄昏';if(i)i.textContent='🌆';}else{t.textContent='夜晚';if(i)i.textContent='🌙';}}
+        toggleDayNight(){this.timeOfDay+=0.5;if(this.timeOfDay>1)this.timeOfDay-=1;this.updateTimeOfDay();}
+        updateCrosshair(){if(!this.controls||!this.controls.isLocked)return;const r=new THREE.Raycaster();r.setFromCamera(new THREE.Vector2(),this.camera);const is=r.intersectObjects(Array.from(this.blocks.values()));const h=document.getElementById('crosshair-h'),v=document.getElementById('crosshair-v'),d=document.getElementById('crosshair-dot');if(is.length>0){if(h)h.classList.add('targeting');if(v)v.classList.add('targeting');if(d)d.classList.add('targeting');this.isTargeting=true;}else{if(h)h.classList.remove('targeting');if(v)v.classList.remove('targeting');if(d)d.classList.remove('targeting');this.isTargeting=false;}}
+
+        init(){
+            this.renderer.setSize(window.innerWidth,window.innerHeight);this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+            this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+            document.body.appendChild(this.renderer.domElement);this.camera.position.copy(this.player.position);
+            this.ambientLight=new THREE.AmbientLight(0xffffff,0.6);this.scene.add(this.ambientLight);
+            this.directionalLight=new THREE.DirectionalLight(0xffffff,0.8);this.directionalLight.position.copy(this.sunPosition);
+            this.directionalLight.castShadow=true;this.directionalLight.shadow.mapSize.width=512;this.directionalLight.shadow.mapSize.height=512;this.scene.add(this.directionalLight);
+            this.scene.background=new THREE.Color(0x87CEEB);
+            this.loadTextures();this.generateWorld();
+            this.controls=new THREE.PointerLockControls(this.camera,document.body);
+            this.setupEventListeners();this.updateHotbar();this.initCraftSlots();this.generateClouds();this.animate();
+        }
+
+        initCraftSlots(){this.craftSlots=[null,null,null,null];}
+
+        loadTextures(){
+            const l=new THREE.TextureLoader();const colors={dirt:0x8B4513,grass:0x228B22,stone:0x808080,wood:0x8B0000,leaf:0x00cc00,sand:0xf4a460,coal:0x333333,iron:0xc0c0c0,gold:0xFFD700,diamond:0xb9f2ff,plank:0xD2691E,stick:0x8B4513,cobblestone:0x696969};
+            for(let[t,c]of Object.entries(colors))this.sharedMaterials[t]=new THREE.MeshLambertMaterial({color:c});
+            this.sharedMaterials['water']=new THREE.MeshLambertMaterial({color:0x3399ff,transparent:true,opacity:0.6});
+            let loaded=0;const texUrls={grass:'https://i0.hdslb.com/bfs/new_dyn/a4d24fafe3785d87e397217d171e181c1644842257.jpg@600w_600h.webp',dirt:'https://img2.baidu.com/it/u=1450518853,3720256352&fm=253&fmt=auto&app=138&f=JPEG?w=800&h=500',stone:'https://pics3.baidu.com/feed/1b4c510fd9f9d72a549ae6194569ef3b359bbb8f.jpeg@f_auto?token=571478fccc033bea11d75f3bbf30e7bf',wood:'https://pics3.baidu.com/feed/1b4c510fd9f9d72a549ae6194569ef3b359bbb8f.jpeg@f_auto?token=571478fccc033bea11d75f3bbf30e7bf',leaf:'https://pics3.baidu.com/feed/1b4c510fd9f9d72a549ae6194569ef3b359bbb8f.jpeg@f_auto?token=571478fccc033bea11d75f3bbf30e7bf',sand:'https://raw.githubusercontent.com/misode/mcmeta/summary/assets/minecraft/textures/block/sand.png',coal:'https://raw.githubusercontent.com/misode/mcmeta/summary/assets/minecraft/textures/block/coal_ore.png',iron:'https://raw.githubusercontent.com/misode/mcmeta/summary/assets/minecraft/textures/block/iron_ore.png',gold:'https://raw.githubusercontent.com/misode/mcmeta/summary/assets/minecraft/textures/block/gold_ore.png',diamond:'https://raw.githubusercontent.com/misode/mcmeta/summary/assets/minecraft/textures/block/diamond_ore.png'};
+            const total=Object.keys(texUrls).length;
+            const done=()=>{loaded++;this.texturesLoaded=loaded;if(loaded>=total){this.allTexturesReady=true;document.getElementById('loadingStatus').textContent='加载完成!';this.checkAllReady();}};
+            for(let[t,u]of Object.entries(texUrls)){l.load(u,(tx)=>{tx.magFilter=THREE.NearestFilter;tx.minFilter=THREE.NearestFilter;const nm=new THREE.MeshLambertMaterial({map:tx});this.sharedMaterials[t]=nm;this.updateBlockMaterial(t,nm);done();},undefined,()=>{done();});}
+        }
+
+        updateBlockMaterial(type,mat){for(let[k,b]of this.blocks.entries()){if(b.userData.type===type)b.material=mat;}}
+        createWaterBlock(x,y,z){const k=`${x},${y},${z}`;if(this.blocks.has(k)){this.scene.remove(this.blocks.get(k));this.blocks.delete(k);}const wc=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),this.sharedMaterials['water']);wc.position.set(x,y,z);wc.castShadow=false;wc.receiveShadow=false;wc.userData={type:'water',x,y,z};this.scene.add(wc);this.blocks.set(k,wc);}
+        updateWaterFlow(){this.waterFlowTimer++;if(this.waterFlowTimer<this.waterFlowInterval)return;this.waterFlowTimer=0;const wb=[];for(let[k,b]of this.blocks.entries())if(b.userData.type==='water')wb.push(b.userData);if(wb.length===0)return;const nwp=new Set();for(let w of wb){const{x,y,z}=w;const k=`${x},${y-1},${z}`;const bl=this.blocks.get(k);if(!bl||bl.userData.type==='water')nwp.add(k);else for(let[nx,ny,nz]of[[x+1,y,z],[x-1,y,z],[x,y,z+1],[x,y,z-1]]){const nk=`${nx},${ny},${nz}`;const nb=this.blocks.get(nk);const sb=this.blocks.get(`${nx},${ny-1},${nz}`);if((!nb||nb.userData.type==='water')&&sb&&sb.userData.type!=='water'){nwp.add(nk);break;}}}for(let p of nwp){const[x,y,z]=p.split(',').map(Number);if(!this.blocks.has(p))this.createWaterBlock(x,y,z);}}
+
+        generateWorld(){this.blocks.forEach(b=>this.scene.remove(b));this.blocks.clear();const bh=8;
+        for(let x=-this.worldSize;x<this.worldSize;x++){for(let z=-this.worldSize;z<this.worldSize;z++){let h=bh;const v=Math.random();if(v>0.95)h+=2;else if(v>0.85)h+=1;else if(v<0.05)h-=1;
+        if(Math.random()<0.2){for(let y=0;y<5;y++){this.addBlock(x,y,z,y===4?Math.random()>0.5?'sand':'dirt':y>1?Math.random()>0.6?'sand':'stone':'stone',false);}for(let y=5;y<bh;y++){if(!this.blocks.has(`${x},${y},${z}`))this.createWaterBlock(x,y,z);}}
+        else{for(let y=0;y<h;y++){let bt='stone';if(y===h-1)bt='grass';else if(y>h-4)bt='dirt';else if(y<4)bt='stone';else{const r=Math.random();if(r>0.98)bt='diamond';else if(r>0.95)bt='gold';else if(r>0.9)bt='iron';else if(r>0.82)bt='coal';else bt='stone';}this.addBlock(x,y,z,bt,false);}}}}
+        for(let i=0;i<20;i++){const x=Math.floor(Math.random()*this.worldSize*1.8)-this.worldSize*0.9;const z=Math.floor(Math.random()*this.worldSize*1.8)-this.worldSize*0.9;let gy=0;for(let y=0;y<20;y++)if(this.blocks.has(`${x},${y},${z}`))gy=y+1;if(gy===bh||gy===bh+1||gy===bh+2){const wc=this.blocks.get(`${x},${gy},${z}`);if(!wc||wc.userData.type!=='water')this.generateTree(x,gy,z);}}
+        this.generateMobs();this.worldReady=true;this.checkAllReady();}
+        generateTree(x,y,z){for(let i=0;i<4;i++)this.addBlock(x,y+i,z,'wood',false);for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++)for(let dy=0;dy<2;dy++)if(!(dx===0&&dz===0&&dy===0))this.addBlock(x+dx,y+3+dy,z+dz,'leaf',false);}
+        generateMobs(){const mc={sheep:0xEEEEEE,pig:0xFFB6C1,cow:0xC19A6B};for(let i=0;i<12;i++){const x=(Math.random()-0.5)*35,z=(Math.random()-0.5)*35;const t=['sheep','pig','cow'][Math.floor(Math.random()*3)];const mg=new THREE.Group();const bm=new THREE.MeshLambertMaterial({color:mc[t]});const bd=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.8,1.2),bm);bd.position.y=0.4;bd.castShadow=this.shadowsEnabled;mg.add(bd);const hd=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.6,0.6),bm);hd.position.set(0,0.8,0.6);hd.castShadow=this.shadowsEnabled;mg.add(hd);const lm=new THREE.MeshLambertMaterial({color:mc[t]});[[-0.3,0.2,-0.4],[0.3,0.2,-0.4],[-0.3,0.2,0.4],[0.3,0.2,0.4]].forEach(p=>{const lg=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.4,0.2),lm);lg.position.set(p[0],p[1],p[2]);lg.castShadow=this.shadowsEnabled;mg.add(lg);});mg.position.set(x,15,z);mg.rotation.y=Math.random()*Math.PI*2;this.mobs.push({group:mg,type:t,position:{x,y:15,z},rotation:Math.random()*Math.PI*2,speed:0.008,walkTimer:0});this.scene.add(mg);}document.getElementById('mobCount').textContent=this.mobs.length;}
+        updateMobs(){for(let m of this.mobs){m.walkTimer+=0.1;if(m.walkTimer>80){m.walkTimer=0;m.rotation=Math.random()*Math.PI*2;}if(m.walkTimer%60<30){const dx=Math.sin(m.rotation)*m.speed,dz=Math.cos(m.rotation)*m.speed;const nx=m.position.x+dx,nz=m.position.z+dz;if(Math.abs(nx)<this.worldSize&&Math.abs(nz)<this.worldSize){m.position.x=nx;m.position.z=nz;}else m.rotation+=0.3;}m.group.position.x=m.position.x;m.group.position.z=m.position.z;m.group.rotation.y=m.rotation;}}
+        spawnDropItem(x,y,z,t,c=1){const g=new THREE.Group();const co={grass:0x228B22,dirt:0x8B4513,stone:0x808080,wood:0x8B0000,leaf:0x00cc00,sand:0xf4a460,coal:0x333,iron:0xc0c0c0,gold:0xFFD700,diamond:0xb9f2ff,plank:0xD2691E,stick:0x8B4513,cobblestone:0x696969};const cb=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.4),new THREE.MeshLambertMaterial({color:co[t]||0xffffff}));cb.castShadow=this.shadowsEnabled;g.add(cb);g.position.set(x,y+0.5,z);this.dropItems.push({group:g,type:t,count:c,velocity:new THREE.Vector3((Math.random()-0.5)*0.1,0.2+Math.random()*0.1,(Math.random()-0.5)*0.1),position:{x,y:y+0.5,z},age:0,lifeTime:600});this.scene.add(g);}
+        updateDropItems(){for(let i=this.dropItems.length-1;i>=0;i--){const it=this.dropItems[i];it.age++;it.velocity.y-=0.02;it.position.y+=it.velocity.y;if(it.position.y<=1){it.position.y=1;it.velocity.y=0;}it.position.x+=it.velocity.x;it.position.z+=it.velocity.z;it.group.position.set(it.position.x,it.position.y,it.position.z);it.group.rotation.y+=0.05;const dx=this.player.position.x-it.position.x,dy=this.player.position.y-it.position.y,dz=this.player.position.z-it.position.z;const ds=Math.sqrt(dx*dx+dy*dy+dz*dz);if(ds<1.2){this.addItem(it.type,it.count);this.scene.remove(it.group);this.dropItems.splice(i,1);}else if(it.age>it.lifeTime){this.scene.remove(it.group);this.dropItems.splice(i,1);}}}
+        addBlock(x,y,z,t,fi=true){if(this.survivalMode&&fi){const sel=this.getSelectedType();if(sel!==t)return false;if(!this.removeItem(t,1))return false;}const k=`${x},${y},${z}`;if(this.blocks.has(k))return false;const cb=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),this.sharedMaterials[t]||this.sharedMaterials['stone']);cb.position.set(x,y,z);cb.castShadow=(t!=='water')&&this.shadowsEnabled;cb.receiveShadow=false;cb.userData={type:t,x,y,z};this.scene.add(cb);this.blocks.set(k,cb);return true;}
+        removeBlock(x,y,z){const k=`${x},${y},${z}`;if(this.blocks.has(k)){const b=this.blocks.get(k);if(b.userData.type==='water')return;this.scene.remove(b);this.blocks.delete(k);if(this.survivalMode){this.spawnDropItem(x,y,z,b.userData.type,1);this.hunger=Math.max(0,this.hunger-0.2);document.getElementById('hunger').textContent=Math.floor(this.hunger*10)/10;}}}
+        generateClouds(){const cm=new THREE.MeshLambertMaterial({color:0xffffff,transparent:true,opacity:0.7});for(let i=0;i<12;i++){const cg=new THREE.Group();for(let j=0;j<3+Math.floor(Math.random()*2);j++){const s=new THREE.Mesh(new THREE.SphereGeometry(0.7,5,5),cm);s.position.set((Math.random()-0.5)*2,(Math.random()-0.5)*0.6,(Math.random()-0.5)*1.5);cg.add(s);}cg.position.set((Math.random()-0.5)*55,22+Math.random()*6,(Math.random()-0.5)*55);this.clouds.push({group:cg,speed:0.004+Math.random()*0.006,dir:Math.random()>0.5?1:-1,baseX:cg.position.x,range:12});this.scene.add(cg);}document.getElementById('cloudCount').textContent=this.clouds.length;}
+        updateClouds(){for(let c of this.clouds){c.group.position.x+=c.speed*c.dir;if(Math.abs(c.group.position.x-c.baseX)>c.range)c.dir*=-1;}}
+
+        setupEventListeners(){
+            window.addEventListener('resize',()=>{this.camera.aspect=window.innerWidth/window.innerHeight;this.camera.updateProjectionMatrix();this.renderer.setSize(window.innerWidth,window.innerHeight);});
+            window.addEventListener('beforeunload',()=>{this.saveGame();});
+            // 鼠标滚轮切换快捷栏
+            document.addEventListener('wheel',(e)=>{if(this.inventoryOpen||!this.controls||!this.controls.isLocked)return;e.preventDefault();if(e.deltaY>0)this.selectedSlot=(this.selectedSlot+1)%9;else this.selectedSlot=(this.selectedSlot+8)%9;this.updateHotbar();});
+            // 数字键切换快捷栏
+            document.addEventListener('keydown',(e)=>{if(this.inventoryOpen)return;const num=parseInt(e.key);if(num>=1&&num<=9){this.selectedSlot=num-1;this.updateHotbar();return;}const key=e.key.toLowerCase();this.keys[key]=true;if(key===' '&&this.player.onGround)this.player.velocity.y=0.25;if(key==='r')this.respawn();if(key==='e'){e.preventDefault();this.toggleInventory();}if(key==='t'){e.preventDefault();this.toggleGameMode();}if(key==='p'){e.preventDefault();this.toggleShadows();}});
+            document.addEventListener('keyup',(e)=>{this.keys[e.key.toLowerCase()]=false;});
+            document.addEventListener('mousedown',(e)=>{
+                if(this.inventoryOpen)return;
+                if(!this.controls||!this.controls.isLocked){const lock=()=>{if(this.controls.isLocked||this.inventoryOpen)return;try{this.controls.lock();}catch(err){setTimeout(lock,300);}};lock();return;}
+                const rc=new THREE.Raycaster();rc.setFromCamera(new THREE.Vector2(),this.camera);const is=rc.intersectObjects(Array.from(this.blocks.values()));
+                if(is.length>0){const bl=is[0].object,nm=is[0].face.normal;
+                    if(e.button===2){const nx=Math.round(bl.position.x+nm.x),ny=Math.round(bl.position.y+nm.y),nz=Math.round(bl.position.z+nm.z);if(this.survivalMode){const sel=this.getSelectedType();if(sel)this.addBlock(nx,ny,nz,sel,true);}else this.addBlock(nx,ny,nz,'grass',false);}
+                    else if(e.button===0){this.removeBlock(bl.position.x,bl.position.y,bl.position.z);}}
+            });
+            document.addEventListener('contextmenu',(e)=>e.preventDefault());
+            document.addEventListener('pointerlockchange',()=>{const hint=document.getElementById('clickHint');if(hint)hint.style.display=document.pointerLockElement?'none':'block';});
+            // 拖拽跟随鼠标
+            document.addEventListener('mousemove',(e)=>{if(this.cursorItem){this.dragDiv.style.display='flex';this.dragDiv.style.left=e.clientX+'px';this.dragDiv.style.top=e.clientY+'px';this.dragDiv.innerHTML=`<span>${this.getItemIcon(this.cursorItem.type)}</span><span style="font-size:11px;color:white;position:absolute;bottom:1px;right:3px">${this.cursorItem.count}</span>`;}});
+        }
+
+        respawn(){this.player.position.copy(new THREE.Vector3(0,18,0));this.player.velocity.set(0,0,0);this.camera.position.copy(this.player.position);}
+        handleFallDamage(){if(!this.survivalMode)return;if(this.player.onGround&&this.fallDistance>this.minFallDamageDistance){const d=Math.max(1,Math.floor((this.fallDistance-this.minFallDamageDistance)*0.8));this.health=Math.max(0,this.health-d);document.getElementById('health').textContent=Math.floor(this.health*10)/10;this.fallDistance=0;}else if(!this.player.onGround&&this.player.velocity.y<0){this.fallDistance+=-this.player.velocity.y*0.5;}else if(this.player.onGround){this.fallDistance=0;}}
+        updateFPS(){this.frameCount++;const n=performance.now();if(n-this.lastFpsUpdate>=1000){document.getElementById('fpsValue').textContent=Math.round((this.frameCount*1000)/(n-this.lastFpsUpdate));this.frameCount=0;this.lastFpsUpdate=n;}}
+        checkCollision(x,y,z){const c=[[-0.3,-0.6,-0.3],[0.3,-0.6,-0.3],[-0.3,-0.6,0.3],[0.3,-0.6,0.3],[-0.3,0.6,-0.3],[0.3,0.6,-0.3],[-0.3,0.6,0.3],[0.3,0.6,0.3],[0,0,0]];for(let o of c){const b=this.blocks.get(`${Math.floor(x+o[0])},${Math.floor(y+o[1])},${Math.floor(z+o[2])}`);if(b&&b.userData.type!=='water')return true;}return false;}
+        checkInWater(){const px=Math.floor(this.player.position.x),pz=Math.floor(this.player.position.z),py=Math.floor(this.player.position.y);for(let dy of[-0.3,0.2]){const b=this.blocks.get(`${px},${py+dy},${pz}`);if(b&&b.userData.type==='water')return true;}return false;}
+
+        animate(){
+            requestAnimationFrame(()=>this.animate());
+            if(this.controls&&this.controls.isLocked&&!this.inventoryOpen){
+                const cd=new THREE.Vector3();this.camera.getWorldDirection(cd);cd.y=0;cd.normalize();
+                const cr=new THREE.Vector3();cr.crossVectors(cd,new THREE.Vector3(0,1,0));cr.normalize();
+                this.player.inWater=this.checkInWater();this.player.velocity.y+=this.player.inWater?-0.005:-0.02;
+                const wg=this.player.onGround;this.player.onGround=this.checkCollision(this.player.position.x,this.player.position.y-0.6,this.player.position.z);
+                if(!wg&&this.player.onGround)this.handleFallDamage();
+                if(this.player.onGround&&this.player.velocity.y<0)this.player.velocity.y=0;
+                if(!this.player.onGround&&this.player.velocity.y<0)this.fallDistance+=-this.player.velocity.y;
+                const md=new THREE.Vector3(0,0,0);if(this.keys['w'])md.add(cd);if(this.keys['s'])md.add(cd.clone().multiplyScalar(-1));if(this.keys['a'])md.add(cr.clone().multiplyScalar(-1));if(this.keys['d'])md.add(cr);
+                const sp=this.player.inWater?0.08:0.12;if(md.length()>0)md.normalize();md.multiplyScalar(sp);md.y=this.player.velocity.y;
+                if(!this.checkCollision(this.player.position.x+md.x,this.player.position.y,this.player.position.z))this.player.position.x+=md.x;
+                if(!this.checkCollision(this.player.position.x,this.player.position.y+md.y,this.player.position.z))this.player.position.y+=md.y;else this.player.velocity.y=0;
+                if(!this.checkCollision(this.player.position.x,this.player.position.y,this.player.position.z+md.z))this.player.position.z+=md.z;
+                this.camera.position.copy(this.player.position);this.updateCrosshair();
+            }
+            this.updateWaterFlow();this.updateTimeOfDay();this.updateMobs();this.updateDropItems();this.updateClouds();this.updateFPS();
+            if(this.survivalMode&&Math.random()<0.002){this.hunger=Math.max(0,this.hunger-0.05);document.getElementById('hunger').textContent=Math.floor(this.hunger*10)/10;if(this.hunger<=0){this.health=Math.max(0,this.health-0.02);document.getElementById('health').textContent=Math.floor(this.health*10)/10;}}
+            this.renderer.render(this.scene,this.camera);
+        }
+    }
+    </script>
+</body>
+</html>
