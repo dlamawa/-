@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💬 聊·视·传文件</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js">
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .app {
+            background: #161b22;
+            border-radius: 16px;
+            border: 1px solid #30363d;
+            width: 480px;
+            max-width: 96%;
+            height: 740px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ===== 顶栏 ===== */
+        .header {
+            padding: 10px 14px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            background: #0d1117;
+        }
+        .header .left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header .left h2 {
+            font-size: 17px;
+        }
+        .header .left .id-tag {
+            font-size: 11px;
+            color: #58a6ff;
+            background: #1f2937;
+            padding: 2px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        .header .left .id-tag:hover {
+            background: #2d3748;
+        }
+        .header .right {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .header .right button {
+            background: transparent;
+            border: none;
+            color: #e6edf3;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: 0.2s;
+            font-family: inherit;
+            line-height: 1;
+        }
+        .header .right button:hover {
+            background: #1f2937;
+        }
+        .header .right .clear-btn {
+            font-size: 15px;
+            color: #8b949e;
+        }
+        .header .right .clear-btn:hover {
+            color: #f85149;
+        }
+        .call-status {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #3fb950;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .call-status.show {
+            display: inline-flex;
+        }
+        .call-status .end-btn {
+            background: #da3633;
+            border: none;
+            color: #fff;
+            border-radius: 10px;
+            padding: 2px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .call-status .end-btn:hover {
+            background: #f85149;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* ===== 视频区域 ===== */
+        .video-area {
+            display: none;
+            flex-shrink: 0;
+            background: #0d1117;
+            padding: 6px;
+            gap: 4px;
+            border-bottom: 1px solid #30363d;
+        }
+        .video-area.show {
+            display: flex;
+        }
+        .video-area video {
+            width: 50%;
+            border-radius: 8px;
+            background: #000;
+            border: 1px solid #30363d;
+            max-height: 140px;
+        }
+        .video-area .local-vid {
+            transform: scaleX(-1);
+        }
+        .video-area .remote-vid {
+            transform: scaleX(1);
+        }
+
+        /* ===== 消息列表 ===== */
+        .msgs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .msgs .empty {
+            color: #8b949e;
+            text-align: center;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+        .msg {
+            max-width: 82%;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+        .msg.me {
+            align-self: flex-end;
+            background: #238636;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.other {
+            align-self: flex-start;
+            background: #1f2937;
+            color: #e6edf3;
+            border-bottom-left-radius: 4px;
+        }
+        .msg .name {
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 1px;
+        }
+        .msg .name.me-name {
+            color: #7ee787;
+        }
+        .msg .name.other-name {
+            color: #58a6ff;
+        }
+        .msg .time {
+            font-size: 10px;
+            color: #8b949e;
+            margin-top: 2px;
+            text-align: right;
+        }
+        .msg.system {
+            align-self: center;
+            background: #1f2937;
+            color: #8b949e;
+            font-size: 12px;
+            padding: 3px 14px;
+            border-radius: 20px;
+            max-width: 90%;
+            text-align: center;
+        }
+        /* 文件消息 */
+        .msg.file {
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+        .msg.file .file-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .msg.file .file-icon {
+            font-size: 32px;
+        }
+        .msg.file .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .msg.file .file-name {
+            font-weight: bold;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .msg.file .file-size {
+            font-size: 11px;
+            color: #8b949e;
+        }
+        .msg.file .file-dl {
+            font-size: 12px;
+            color: #58a6ff;
+            background: #1f2937;
+            padding: 2px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .msg.file.me .file-dl {
+            color: #7ee787;
+            background: #0d1117;
+        }
+        .msg.file .file-progress {
+            height: 3px;
+            background: #30363d;
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .msg.file .file-progress .bar {
+            height: 100%;
+            background: #238636;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* ===== 底部 ===== */
+        .footer {
+            padding: 8px 12px;
+            border-top: 1px solid #30363d;
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            align-items: center;
+            background: #0d1117;
+            flex-wrap: wrap;
+        }
+        .footer .row1 {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
+        .footer .nick-input {
+            width: 56px;
+            flex: 0 0 56px;
+            padding: 6px 8px;
+            border-radius: 14px;
+            border: 1px solid #30363d;
+            background: #161b22;
+            color: #e6edf3;
+            font-size: 12px;
+            outline: none;
+            font-family: inherit;
+            text-align: center;
+        }
+        .footer .nick-input:focus {
+            border-color: #238636;
+        }
+        .footer .msg-input {
+            flex: 1;
+            padding: 6px 14px;
+            border-radius: 14px;
+            border: 1px solid #30363d;
+            background: #161b22;
+            color: #e6edf3;
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+        }
+        .footer .msg-input:focus {
+            border-color: #238636;
+        }
+        .footer .send-btn {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 14px;
+            background: #238636;
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+        .footer .send-btn:hover {
+            background: #2ea043;
+        }
+        .footer .file-btn {
+            padding: 6px 12px;
+            border: 1px solid #30363d;
+            border-radius: 14px;
+            background: transparent;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: inherit;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .footer .file-btn:hover {
+            background: #1f2937;
+            color: #e6edf3;
+        }
+
+        /* ===== 通话弹窗 ===== */
+        .call-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            border-radius: 16px;
+            backdrop-filter: blur(4px);
+        }
+        .call-overlay.show {
+            display: flex;
+        }
+        .call-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 20px;
+            padding: 28px 24px 20px;
+            text-align: center;
+            width: 270px;
+            max-width: 85%;
+            animation: popIn 0.2s ease-out;
+        }
+        @keyframes popIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .call-box .icon {
+            font-size: 42px;
+            margin-bottom: 4px;
+        }
+        .call-box .title {
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .call-box .desc {
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 14px;
+        }
+        .call-box .options {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .call-box .options button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .call-box .options .btn-video {
+            background: #238636;
+            color: #fff;
+        }
+        .call-box .options .btn-video:hover {
+            background: #2ea043;
+        }
+        .call-box .options .btn-audio {
+            background: #1f2937;
+            color: #e6edf3;
+            border: 1px solid #30363d;
+        }
+        .call-box .options .btn-audio:hover {
+            background: #2d3748;
+        }
+        .call-box .options .btn-cancel {
+            background: transparent;
+            color: #8b949e;
+            border: 1px solid #30363d;
+            padding: 10px 16px;
+        }
+        .call-box .options .btn-cancel:hover {
+            background: #1f2937;
+            color: #f0f6fc;
+        }
+
+        .msgs::-webkit-scrollbar {
+            width: 4px;
+        }
+        .msgs::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .msgs::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app" id="app">
+
+        <!-- ===== 顶栏 ===== -->
+        <div class="header">
+            <div class="left">
+                <h2>💬 聊·视·件</h2>
+                <span class="id-tag" id="idTag" title="点击复制ID">🔑 <span id="myIdText">连接中</span></span>
+            </div>
+            <div class="right">
+                <button id="callBtn" title="电话">📞</button>
+                <span class="call-status" id="callStatus">
+                    📞 通话中...
+                    <button class="end-btn" id="endCallBtn">挂断</button>
+                </span>
+                <button class="clear-btn" id="clearBtn" title="清空消息">🗑️</button>
+            </div>
+        </div>
+
+        <!-- ===== 视频区域 ===== -->
+        <div class="video-area" id="videoArea">
+            <video class="local-vid" id="localVideo" autoplay muted playsinline></video>
+            <video class="remote-vid" id="remoteVideo" autoplay playsinline></video>
+        </div>
+
+        <!-- ===== 消息列表 ===== -->
+        <div class="msgs" id="msgList">
+            <div class="empty">👋 发消息 · 传文件 · 视频通话</div>
+        </div>
+
+        <!-- ===== 底部 ===== -->
+        <div class="footer">
+            <div class="row1">
+                <input class="nick-input" id="nickInput" placeholder="昵称" maxlength="8" value="我">
+                <input class="msg-input" id="msgInput" placeholder="输入消息..." maxlength="200">
+                <button class="send-btn" id="sendBtn">发送</button>
+                <button class="file-btn" id="fileBtn" title="发送文件（推荐zip）">📎</button>
+            </div>
+        </div>
+
+        <!-- ===== 通话弹窗 ===== -->
+        <div class="call-overlay" id="callOverlay">
+            <div class="call-box">
+                <div class="icon">📞</div>
+                <div class="title">选择通话方式</div>
+                <div class="desc">输入对方ID后选择</div>
+                <div class="options">
+                    <button class="btn-video" id="videoCallBtn">🎥 视频</button>
+                    <button class="btn-audio" id="audioCallBtn">🎤 语音</button>
+                    <button class="btn-cancel" id="cancelCallBtn">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <input type="file" id="fileInput" multiple>
+    </div>
+
+    <script>
+        // ============================================================
+        // 1. 聊天消息
+        // ============================================================
+        const STORAGE_KEY = 'chat_messages';
+
+        function getMessages() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+        }
+
+        function saveMessages(msgs) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
+        }
+
+        function addMsg(nick, text, type, fileData) {
+            const msgs = getMessages();
+            const m = { nick, text, time: Date.now(), isSystem: false, type: type || 'text' };
+            if (fileData) {
+                m.fileName = fileData.name;
+                m.fileSize = fileData.size;
+                m.fileType = fileData.type;
+                m.fileData = fileData.data;
+            }
+            msgs.push(m);
+            if (msgs.length > 500) msgs.splice(0, msgs.length - 500);
+            saveMessages(msgs);
+            renderMessages();
+        }
+
+        function addSystemMsg(text) {
+            const msgs = getMessages();
+            msgs.push({ nick: '系统', text, time: Date.now(), isSystem: true });
+            if (msgs.length > 500) msgs.splice(0, msgs.length - 500);
+            saveMessages(msgs);
+            renderMessages();
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('msgList');
+            const msgs = getMessages();
+            const myNick = document.getElementById('nickInput').value.trim() || '我';
+            if (msgs.length === 0) {
+                container.innerHTML = `<div class="empty">👋 发消息 · 传文件 · 视频通话</div>`;
+                return;
+            }
+            let html = '';
+            for (let m of msgs) {
+                const time = m.time ? new Date(m.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) :
+                '';
+                if (m.isSystem) {
+                    html += `<div class="msg system">${escHtml(m.text)}<div class="time">${time}</div></div>`;
+                    continue;
+                }
+                const isMe = m.nick === myNick;
+                const cls = `msg ${isMe ? 'me' : 'other'}`;
+                const nameCls = isMe ? 'me-name' : 'other-name';
+
+                if (m.type === 'file' && m.fileData) {
+                    const size = (m.fileSize / 1024).toFixed(1) + 'KB';
+                    const icon = getFileIcon(m.fileName);
+                    html += `
+                                <div class="${cls} file" onclick="downloadFile(${msgs.indexOf(m)})">
+                                    <div class="file-row">
+                                        <span class="file-icon">${icon}</span>
+                                        <div class="file-info">
+                                            <div class="file-name">${escHtml(m.fileName)}</div>
+                                            <div class="file-size">${size}</div>
+                                        </div>
+                                        <span class="file-dl">⬇下载</span>
+                                    </div>
+                                    <div class="file-progress"><div class="bar" style="width:100%"></div></div>
+                                </div>
+                                <div class="msg ${isMe ? 'me' : 'other'}" style="padding:2px 14px;font-size:11px;color:#8b949e;max-width:82%;${isMe?'align-self:flex-end;':'align-self:flex-start;'}">
+                                    📎 文件：${escHtml(m.fileName)}
+                                    <div class="time">${time}</div>
+                                </div>
+                            `;
+                    continue;
+                }
+
+                html += `
+                            <div class="${cls}">
+                                <div class="name ${nameCls}">${escHtml(m.nick)}</div>
+                                <div>${escHtml(m.text)}</div>
+                                <div class="time">${time}</div>
+                            </div>
+                        `;
+            }
+            container.innerHTML = html;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function getFileIcon(name) {
+            const ext = name.split('.').pop().toLowerCase();
+            const map = {
+                zip: '📦',
+                rar: '📦',
+                '7z': '📦',
+                mp4: '🎬',
+                avi: '🎬',
+                mkv: '🎬',
+                mp3: '🎵',
+                wav: '🎵',
+                flac: '🎵',
+                jpg: '🖼️',
+                jpeg: '🖼️',
+                png: '🖼️',
+                gif: '🖼️',
+                pdf: '📄',
+                doc: '📄',
+                docx: '📄',
+                xls: '📊',
+                xlsx: '📊',
+                ppt: '📊',
+                pptx: '📊',
+                txt: '📃',
+                js: '📜',
+                html: '📜',
+                css: '📜',
+                json: '📜',
+                exe: '⚙️',
+                dmg: '💿',
+                apk: '📱'
+            };
+            return map[ext] || '📁';
+        }
+
+        function escHtml(str) { const d = document.createElement('div');
+            d.textContent = str; return d.innerHTML; }
+
+        function downloadFile(index) {
+            const msgs = getMessages();
+            const m = msgs[index];
+            if (!m || !m.fileData) return;
+            try {
+                const byteChars = atob(m.fileData);
+                const byteNumbers = new Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) {
+                    byteNumbers[i] = byteChars.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: m.fileType || 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = m.fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                addSystemMsg('📥 已下载: ' + m.fileName);
+            } catch (e) {
+                addSystemMsg('❌ 下载失败: ' + e.message);
+            }
+        }
+
+        // ============================================================
+        // 2. 发送文件
+        // ============================================================
+        function sendFile(file) {
+            const nick = document.getElementById('nickInput').value.trim() || '我';
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = btoa(e.target.result);
+                addMsg(nick, '', 'file', { name: file.name, size: file.size, type: file.type, data: data });
+                addSystemMsg('📤 已发送文件: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + 'KB)');
+                // 如果有通话连接，通过数据通道发送
+                if (currentCall && currentCall.peerConnection) {
+                    sendFileViaDataChannel(file);
+                }
+            };
+            reader.readAsBinaryString(file);
+        }
+
+        // ============================================================
+        // 3. PeerJS 视频通话 + 文件传输
+        // ============================================================
+        let peer = null;
+        let currentCall = null;
+        let localStream = null;
+        let isCalling = false;
+        let dataChannel = null;
+
+        const PEER_CONFIG = { host: '0.peerjs.com', port: 443, path: '/', secure: true };
+
+        function initPeer() {
+            const id = 'u' + Math.random().toString(36).substring(2, 8);
+            peer = new Peer(id, PEER_CONFIG);
+            peer.on('open', (pid) => {
+                document.getElementById('myIdText').textContent = pid;
+                document.getElementById('idTag').title = '点击复制ID: ' + pid;
+                addSystemMsg('✅ 已上线，ID: ' + pid);
+            });
+            peer.on('error', (err) => {
+                console.error(err);
+                addSystemMsg('❌ 连接错误: ' + err.message);
+            });
+            peer.on('call', (incoming) => {
+                if (isCalling) { incoming.close(); return; }
+                addSystemMsg('📞 收到来自 ' + incoming.peer + ' 的通话请求');
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .then(stream => {
+                        localStream = stream;
+                        document.getElementById('localVideo').srcObject = stream;
+                        document.getElementById('videoArea').classList.add('show');
+                        incoming.answer(stream);
+                        handleCall(incoming);
+                    })
+                    .catch(() => addSystemMsg('❌ 无法打开摄像头/麦克风'));
+            });
+        }
+
+        function handleCall(call) {
+            currentCall = call;
+            isCalling = true;
+            document.getElementById('callStatus').classList.add('show');
+            document.getElementById('callBtn').style.display = 'none';
+
+            // 监听数据通道
+            call.peerConnection.ondatachannel = function(event) {
+                dataChannel = event.channel;
+                setupDataChannel();
+            };
+
+            call.on('stream', (remote) => {
+                document.getElementById('remoteVideo').srcObject = remote;
+                addSystemMsg('📹 视频已连接');
+            });
+            call.on('close', () => { endCall();
+                addSystemMsg('📞 通话已结束'); });
+            call.on('error', () => { endCall();
+                addSystemMsg('❌ 通话出错'); });
+        }
+
+        function setupDataChannel() {
+            if (!dataChannel) return;
+            dataChannel.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'file') {
+                        addSystemMsg('📥 收到文件: ' + data.name + ' (' + (data.size / 1024).toFixed(1) + 'KB)');
+                        // 保存到消息列表
+                        addMsg('对方', '', 'file', { name: data.name, size: data.size, type: data.type, data: data
+                                .content });
+                    }
+                } catch (e) {
+                    console.error('数据通道错误:', e);
+                }
+            };
+        }
+
+        function sendFileViaDataChannel(file) {
+            if (!dataChannel || dataChannel.readyState !== 'open') {
+                addSystemMsg('⚠️ 未建立数据通道，文件仅保存在本地');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = {
+                    type: 'file',
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    content: btoa(e.target.result)
+                };
+                dataChannel.send(JSON.stringify(data));
+                addSystemMsg('📤 已通过数据通道发送文件: ' + file.name);
+            };
+            reader.readAsBinaryString(file);
+        }
+
+        function startCall(type) {
+            const target = document.getElementById('idTag').textContent.trim();
+            if (!target || target === '连接中' || target === document.getElementById('myIdText').textContent) {
+                addSystemMsg('⚠️ 请输入有效的对方ID');
+                return;
+            }
+            hideCallOverlay();
+            addSystemMsg('📞 正在呼叫 ' + target + ' (' + type + ')');
+            navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true })
+                .then(stream => {
+                    localStream = stream;
+                    if (type === 'video') {
+                        document.getElementById('localVideo').srcObject = stream;
+                        document.getElementById('videoArea').classList.add('show');
+                    }
+                    const call = peer.call(target, stream);
+                    // 创建数据通道用于传文件
+                    const dc = call.peerConnection.createDataChannel('fileTransfer');
+                    dataChannel = dc;
+                    setupDataChannel();
+                    handleCall(call);
+                })
+                .catch(() => addSystemMsg('❌ 无法打开摄像头或麦克风'));
+        }
+
+        function endCall() {
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            isCalling = false;
+            dataChannel = null;
+            document.getElementById('callStatus').classList.remove('show');
+            document.getElementById('callBtn').style.display = 'inline-block';
+            document.getElementById('videoArea').classList.remove('show');
+            document.getElementById('localVideo').srcObject = null;
+            document.getElementById('remoteVideo').srcObject = null;
+        }
+
+        // ============================================================
+        // 4. UI 事件
+        // ============================================================
+        function showCallOverlay() { document.getElementById('callOverlay').classList.add('show'); }
+
+        function hideCallOverlay() { document.getElementById('callOverlay').classList.remove('show'); }
+
+        // 发送消息
+        document.getElementById('sendBtn').addEventListener('click', function() {
+            const nick = document.getElementById('nickInput').value.trim() || '我';
+            const text = document.getElementById('msgInput').value.trim();
+            if (!text) return;
+            addMsg(nick, text);
+            document.getElementById('msgInput').value = '';
+        });
+        document.getElementById('msgInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault();
+                document.getElementById('sendBtn').click(); }
+        });
+
+        // 清空
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            if (confirm('老6，没想到聪明的我把变量改了吗')) {
+                localStorage.removeItem(S);
+                renderMessages();
+                addSystemMsg('🗑️ 已清空消息');
+            }
+        });
+
+        // 复制ID
+        document.getElementById('idTag').addEventListener('click', function() {
+            const id = document.getElementById('myIdText').textContent;
+            if (id && id !== '连接中') {
+                navigator.clipboard.writeText(id).catch(() => {});
+                addSystemMsg('✅ 已复制ID: ' + id);
+            }
+        });
+
+        // 通话
+        document.getElementById('callBtn').addEventListener('click', showCallOverlay);
+        document.getElementById('videoCallBtn').addEventListener('click', function() { startCall('video'); });
+        document.getElementById('audioCallBtn').addEventListener('click', function() { startCall('audio'); });
+        document.getElementById('cancelCallBtn').addEventListener('click', hideCallOverlay);
+        document.getElementById('callOverlay').addEventListener('click', function(e) {
+            if (e.target === this) hideCallOverlay();
+        });
+        document.getElementById('endCallBtn').addEventListener('click', endCall);
+
+        // 文件
+        document.getElementById('fileBtn').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            for (let file of this.files) {
+                sendFile(file);
+            }
+            this.value = '';
+        });
+
+        // 昵称改变时重绘
+        document.getElementById('nickInput').addEventListener('change', renderMessages);
+
+        // ============================================================
+        // 5. 启动
+        // ============================================================
+        initPeer();
+        renderMessages();
+        addSystemMsg('🚀 已启动，支持聊天 · 视频通话 · 文件传输');
+        addSystemMsg('💡 推荐发送 .zip 文件');
+    </script>
+</body>
+</html>
