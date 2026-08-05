@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>多轨道剪辑 · 修复导出</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0b0e14;
+            color: #eef2f6;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 16px;
+        }
+        .app {
+            max-width: 960px;
+            width: 100%;
+            background: #1a1f2a;
+            border-radius: 28px;
+            padding: 20px 18px 24px;
+            border: 1px solid #2e3748;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+        h1 {
+            font-size: 1.3rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        h1 small { font-size: 0.7rem; font-weight: 400; color: #8892a8; margin-left: auto; }
+        .preview {
+            background: #0f131c;
+            border-radius: 16px;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #2f384b;
+            position: relative;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #0a0d14;
+            object-fit: contain;
+            cursor: pointer;
+        }
+        .placeholder { color: #5a657e; font-size: 0.85rem; padding: 12px; text-align: center; }
+
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #111824;
+            border-radius: 40px;
+            border: 1px solid #293142;
+            flex-wrap: wrap;
+        }
+        .playback-controls .btn {
+            background: #2b3447;
+            border: none;
+            color: #eef2f6;
+            font-size: 0.8rem;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            border: 1px solid #3b455c;
+            transition: 0.15s;
+            min-width: 44px;
+        }
+        .playback-controls .btn-primary { background: #3b6eff; border-color: #4f7aff; color: white; }
+        .playback-controls .btn-primary:hover { background: #2a5adf; }
+        .playback-controls .btn-outline { background: transparent; }
+        .playback-controls .btn-outline:hover { background: #1e2535; }
+        .playback-controls input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 10px;
+            background: #2b354a;
+            outline: none;
+            min-width: 80px;
+        }
+        .playback-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #3b6eff;
+            cursor: pointer;
+            border: 2px solid #f0f4ff;
+            box-shadow: 0 2px 8px rgba(59,110,255,0.4);
+        }
+        .playback-controls input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #3b6eff;
+            cursor: pointer;
+            border: 2px solid #f0f4ff;
+        }
+        .playback-controls .time-display {
+            font-size: 0.7rem;
+            color: #8d99b3;
+            font-variant-numeric: tabular-nums;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            align-items: center;
+        }
+        .btn {
+            background: #2b3447;
+            border: none;
+            color: #eef2f6;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 7px 14px;
+            border-radius: 60px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: 0.2s ease;
+            border: 1px solid #3b455c;
+        }
+        .btn-primary { background: #3b6eff; border-color: #4f7aff; color: white; box-shadow: 0 4px 12px rgba(59,110,255,0.3); }
+        .btn-primary:active { background: #2a5adf; }
+        .btn-success { background: #1f9a6e; border-color: #2bb082; color: white; }
+        .btn-success:active { background: #15835c; }
+        .btn-danger { background: #d1534b; border-color: #e0645c; color: white; }
+        .btn-danger:active { background: #b8433c; }
+        .btn-outline { background: transparent; border: 1px solid #44506b; }
+        .btn-outline:active { background: #1e2535; }
+        .btn:disabled { opacity: 0.4; pointer-events: none; filter: grayscale(0.5); }
+
+        .track-container {
+            margin-top: 12px;
+            background: #10161f;
+            border-radius: 16px;
+            border: 1px solid #293142;
+            padding: 10px 12px;
+        }
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.65rem;
+            color: #6a7a94;
+            padding: 0 4px 6px 4px;
+            border-bottom: 1px solid #1f283a;
+        }
+        .track-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            border-bottom: 1px solid #1a2332;
+        }
+        .track-row:last-child { border-bottom: none; }
+        .track-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #8d99b3;
+            min-width: 48px;
+            letter-spacing: 0.3px;
+        }
+        .track-label .icon { margin-right: 4px; }
+        .track-bar {
+            flex: 1;
+            height: 28px;
+            background: #0d1420;
+            border-radius: 8px;
+            border: 1px solid #232d42;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .track-bar .clip-region {
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            left: 0%;
+            right: 0%;
+            background: #2a3a5a;
+            border-radius: 5px;
+            border: 1px solid #4a6a8a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.5rem;
+            color: #aac0e0;
+            transition: 0.1s;
+        }
+        .track-bar .clip-region.video-track { background: #1f4a6e; border-color: #3a7aaa; }
+        .track-bar .clip-region.audio-track { background: #4a3a5a; border-color: #7a5a8a; }
+        .track-bar .clip-region.dub-track { background: #2a5a4a; border-color: #4a8a6a; }
+        .track-bar .playhead {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #ff6b6b;
+            left: 0%;
+            z-index: 5;
+            pointer-events: none;
+            box-shadow: 0 0 6px rgba(255,80,80,0.6);
+        }
+        .track-bar .time-markers {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 4px;
+            font-size: 0.5rem;
+            color: #3a4a5a;
+            align-items: flex-end;
+            padding-bottom: 2px;
+        }
+        .track-controls {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .track-controls .btn { padding: 4px 10px; font-size: 0.65rem; }
+
+        .clip-slider-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #1a2332;
+        }
+        .clip-slider-wrap input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            flex: 1;
+            height: 4px;
+            border-radius: 10px;
+            background: #2b354a;
+            outline: none;
+        }
+        .clip-slider-wrap input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b6eff;
+            cursor: pointer;
+            border: 2px solid #f0f4ff;
+            box-shadow: 0 2px 8px rgba(59,110,255,0.5);
+        }
+        .clip-slider-wrap input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b6eff;
+            cursor: pointer;
+            border: 2px solid #f0f4ff;
+        }
+        .time-label-sm {
+            font-size: 0.65rem;
+            background: #1f2738;
+            padding: 2px 10px;
+            border-radius: 30px;
+            border: 1px solid #32405a;
+            color: #c8d0e0;
+            min-width: 48px;
+            text-align: center;
+        }
+
+        .dub-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            align-items: center;
+        }
+        .dub-controls label { font-size: 0.7rem; color: #8d99b3; }
+        .dub-controls input[type="range"] {
+            width: 80px;
+            height: 3px;
+            -webkit-appearance: none;
+            background: #2b354a;
+            border-radius: 10px;
+            outline: none;
+        }
+        .dub-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #3b6eff;
+            cursor: pointer;
+            border: 1px solid #f0f4ff;
+        }
+        .dub-status {
+            font-size: 0.6rem;
+            color: #7a8aa8;
+            padding: 2px 10px;
+            background: #1a2332;
+            border-radius: 30px;
+            border: 1px solid #2f3c57;
+        }
+        .dub-status.success { color: #5fcf9a; border-color: #2bb082; }
+        .dub-status.recording { color: #ff7b72; border-color: #d1534b; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        .footer {
+            margin-top: 12px;
+            font-size: 0.6rem;
+            color: #4c5a75;
+            text-align: right;
+            border-top: 1px solid #232b3d;
+            padding-top: 10px;
+        }
+        input[type="file"] { display: none; }
+        @media (max-width: 600px) {
+            .app { padding: 12px; }
+            .btn { padding: 5px 10px; font-size: 0.65rem; }
+            .track-label { min-width: 36px; font-size: 0.55rem; }
+            .playback-controls { flex-wrap: wrap; gap: 6px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <h1>
+        🎬 多轨道剪辑
+        <small>视频 · 音频 · 配音</small>
+    </h1>
+
+    <div class="preview">
+        <video id="videoPlayer" muted playsinline></video>
+        <div class="placeholder" id="placeholderText">⏺ 录制或加载视频 · 点击画面播放</div>
+    </div>
+
+    <div class="playback-controls">
+        <button class="btn btn-primary" id="playPauseBtn">▶ 播放</button>
+        <input type="range" id="progressSlider" min="0" max="100" value="0">
+        <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
+        <button class="btn btn-outline" id="muteBtn">🔊</button>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-primary" id="recordBtn">🔴 录屏</button>
+        <button class="btn btn-outline" id="pauseRecordBtn" disabled>⏸️</button>
+        <button class="btn btn-success" id="loadVideoBtn">📁 加载视频</button>
+        <button class="btn btn-danger" id="resetBtn">↺ 重置</button>
+        <input type="file" id="fileInput" accept="video/*">
+    </div>
+
+    <div class="track-container">
+        <div class="track-header">
+            <span>⏱️ 轨道视图</span>
+            <span id="durationDisplay">00:00 / 00:00</span>
+        </div>
+
+        <div class="track-row">
+            <span class="track-label"><span class="icon">🎬</span>视频</span>
+            <div class="track-bar" id="videoTrackBar">
+                <div class="clip-region video-track" id="videoClipRegion">视频片段</div>
+                <div class="playhead" id="videoPlayhead" style="left:0%;"></div>
+                <div class="time-markers">
+                    <span>0</span>
+                    <span id="trackMidMarker">50%</span>
+                    <span id="trackEndMarker">100%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="track-row">
+            <span class="track-label"><span class="icon">🎵</span>音频</span>
+            <div class="track-bar" id="audioTrackBar">
+                <div class="clip-region audio-track" id="audioClipRegion">原始音频</div>
+                <div class="playhead" id="audioPlayhead" style="left:0%;"></div>
+            </div>
+        </div>
+
+        <div class="track-row">
+            <span class="track-label"><span class="icon">🎙️</span>配音</span>
+            <div class="track-bar" id="dubTrackBar">
+                <div class="clip-region dub-track" id="dubClipRegion" style="display:none;">后期配音</div>
+                <div class="playhead" id="dubPlayhead" style="left:0%;"></div>
+            </div>
+            <div class="track-controls">
+                <button class="btn btn-danger" id="startDubBtn">🎤 录</button>
+                <button class="btn btn-outline" id="stopDubBtn" disabled>⏹</button>
+                <button class="btn btn-outline" id="playDubBtn" disabled>▶</button>
+                <button class="btn btn-outline" id="uploadDubBtn">📤</button>
+                <input type="file" id="dubFileInput" accept="audio/*">
+            </div>
+        </div>
+
+        <div class="clip-slider-wrap">
+            <span class="time-label-sm" id="startTimeLabel">0.0s</span>
+            <input type="range" id="clipRange" min="0" max="100" value="0" step="0.01">
+            <span class="time-label-sm" id="endTimeLabel">0.0s</span>
+            <button class="btn btn-primary" id="applyClipBtn" style="padding:4px 12px;">✂️ 应用</button>
+        </div>
+
+        <div class="dub-controls">
+            <label>🔊 音量</label>
+            <input type="range" id="dubVolume" min="0" max="200" value="100">
+            <span class="time-label-sm" id="dubVolumeLabel" style="min-width:32px;">100%</span>
+            <label style="margin-left:6px;">⏳ 偏移</label>
+            <input type="range" id="dubOffset" min="-5" max="5" value="0" step="0.1">
+            <span class="time-label-sm" id="dubOffsetLabel" style="min-width:36px;">0.0s</span>
+            <span class="dub-status" id="dubStatus">无配音</span>
+            <button class="btn btn-success" id="exportBtn" style="margin-left:auto;">💾 导出</button>
+        </div>
+    </div>
+
+    <div class="footer">点击视频画面 · 空格键 播放/暂停 · 导出自动适配浏览器</div>
+</div>
+
+<script>
+    (function() {
+        // ----- DOM -----
+        const video = document.getElementById('videoPlayer');
+        const placeholder = document.getElementById('placeholderText');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const progressSlider = document.getElementById('progressSlider');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const muteBtn = document.getElementById('muteBtn');
+
+        const recordBtn = document.getElementById('recordBtn');
+        const pauseRecordBtn = document.getElementById('pauseRecordBtn');
+        const loadVideoBtn = document.getElementById('loadVideoBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const fileInput = document.getElementById('fileInput');
+        const clipRange = document.getElementById('clipRange');
+        const startTimeLabel = document.getElementById('startTimeLabel');
+        const endTimeLabel = document.getElementById('endTimeLabel');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const applyClipBtn = document.getElementById('applyClipBtn');
+        const exportBtn = document.getElementById('exportBtn');
+
+        const videoClipRegion = document.getElementById('videoClipRegion');
+        const audioClipRegion = document.getElementById('audioClipRegion');
+        const dubClipRegion = document.getElementById('dubClipRegion');
+        const videoPlayhead = document.getElementById('videoPlayhead');
+        const audioPlayhead = document.getElementById('audioPlayhead');
+        const dubPlayhead = document.getElementById('dubPlayhead');
+        const trackMidMarker = document.getElementById('trackMidMarker');
+        const trackEndMarker = document.getElementById('trackEndMarker');
+
+        const startDubBtn = document.getElementById('startDubBtn');
+        const stopDubBtn = document.getElementById('stopDubBtn');
+        const playDubBtn = document.getElementById('playDubBtn');
+        const uploadDubBtn = document.getElementById('uploadDubBtn');
+        const dubFileInput = document.getElementById('dubFileInput');
+        const dubStatus = document.getElementById('dubStatus');
+        const dubVolume = document.getElementById('dubVolume');
+        const dubVolumeLabel = document.getElementById('dubVolumeLabel');
+        const dubOffset = document.getElementById('dubOffset');
+        const dubOffsetLabel = document.getElementById('dubOffsetLabel');
+
+        // ----- 状态 -----
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let isPaused = false;
+        let recordedBlob = null;
+        let currentFileURL = null;
+        let clipStart = 0, clipEnd = 0, videoDuration = 0;
+
+        let dubMediaRecorder = null;
+        let dubAudioChunks = [];
+        let dubAudioBlob = null;
+        let dubAudioURL = null;
+        let dubAudioBuffer = null;
+        let dubAudioContext = null;
+        let isDubRecording = false;
+
+        // ----- 辅助 -----
+        function formatTime(s) {
+            if (!s || isNaN(s)) return '0.0s';
+            return s.toFixed(1) + 's';
+        }
+        function formatDuration(sec) {
+            if (!sec || isNaN(sec)) return '00:00 / 00:00';
+            const total = Math.floor(sec);
+            const mins = Math.floor(total / 60);
+            const secs = total % 60;
+            return `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        }
+
+        // 获取浏览器支持的 MIME 类型
+        function getSupportedMimeType() {
+            const types = [
+                'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp8,opus',
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm',
+                'video/mp4',
+                'video/mp4;codecs=avc1',
+                'video/ogg;codecs=theora'
+            ];
+            for (const type of types) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    return type;
+                }
+            }
+            return null;
+        }
+
+        const SUPPORTED_MIME = getSupportedMimeType();
+        const IS_WEBM = SUPPORTED_MIME && SUPPORTED_MIME.includes('webm');
+
+        function getExportExtension() {
+            if (SUPPORTED_MIME && SUPPORTED_MIME.includes('webm')) return 'webm';
+            if (SUPPORTED_MIME && SUPPORTED_MIME.includes('mp4')) return 'mp4';
+            return 'webm';
+        }
+
+        function updateUIForVideo() {
+            if (video.duration && !isNaN(video.duration)) {
+                videoDuration = video.duration;
+                durationDisplay.textContent = formatDuration(videoDuration) + ` / ${formatDuration(videoDuration)}`;
+                clipRange.max = videoDuration;
+                clipStart = 0; clipEnd = videoDuration;
+                clipRange.value = 100;
+                updateClipLabels();
+                updateTracks();
+                placeholder.style.display = 'none';
+                video.style.display = 'block';
+                trackEndMarker.textContent = formatDuration(videoDuration);
+                trackMidMarker.textContent = formatDuration(videoDuration / 2);
+            } else {
+                durationDisplay.textContent = '00:00 / 00:00';
+            }
+        }
+
+        function updateClipLabels() {
+            const start = parseFloat(clipStart) || 0;
+            const end = parseFloat(clipEnd) || videoDuration || 0;
+            startTimeLabel.textContent = formatTime(start);
+            endTimeLabel.textContent = formatTime(end);
+            if (videoDuration > 0) {
+                clipRange.value = Math.min(100, (end / videoDuration) * 100);
+            }
+            updateTracks();
+        }
+
+        function updateTracks() {
+            if (!videoDuration || videoDuration <= 0) {
+                videoClipRegion.style.left = '0%';
+                videoClipRegion.style.right = '0%';
+                audioClipRegion.style.left = '0%';
+                audioClipRegion.style.right = '0%';
+                return;
+            }
+            const startPct = (clipStart / videoDuration) * 100;
+            const endPct = (clipEnd / videoDuration) * 100;
+            videoClipRegion.style.left = startPct + '%';
+            videoClipRegion.style.right = (100 - endPct) + '%';
+            audioClipRegion.style.left = startPct + '%';
+            audioClipRegion.style.right = (100 - endPct) + '%';
+            if (dubAudioBuffer) {
+                dubClipRegion.style.display = 'flex';
+                dubClipRegion.style.left = startPct + '%';
+                dubClipRegion.style.right = (100 - endPct) + '%';
+            }
+        }
+
+        function updatePlayhead(time) {
+            if (!videoDuration || videoDuration <= 0) return;
+            const pct = Math.min(100, (time / videoDuration) * 100);
+            videoPlayhead.style.left = pct + '%';
+            audioPlayhead.style.left = pct + '%';
+            dubPlayhead.style.left = pct + '%';
+            progressSlider.value = pct;
+        }
+
+        function loadVideoIntoPlayer(blobOrURL) {
+            let url;
+            if (typeof blobOrURL === 'string') url = blobOrURL;
+            else if (blobOrURL instanceof Blob) url = URL.createObjectURL(blobOrURL);
+            else return;
+            if (currentFileURL && currentFileURL.startsWith('blob:')) URL.revokeObjectURL(currentFileURL);
+            currentFileURL = url;
+            video.src = url;
+            video.load();
+            video.onloadedmetadata = function() {
+                videoDuration = video.duration;
+                clipStart = 0; clipEnd = videoDuration;
+                clipRange.max = videoDuration;
+                clipRange.value = 100;
+                updateUIForVideo();
+                updateClipLabels();
+                updateTracks();
+                video.play().catch(() => {});
+                updatePlayhead(0);
+            };
+            video.onerror = function() {
+                placeholder.style.display = 'block';
+                placeholder.textContent = '⚠️ 无法加载视频';
+            };
+            recordedBlob = null;
+        }
+
+        function resetAll() {
+            if (mediaRecorder && isRecording) { mediaRecorder.stop(); isRecording = false; }
+            if (dubMediaRecorder && isDubRecording) { dubMediaRecorder.stop(); isDubRecording = false; }
+            if (currentFileURL) { URL.revokeObjectURL(currentFileURL); currentFileURL = null; }
+            if (dubAudioURL) { URL.revokeObjectURL(dubAudioURL); dubAudioURL = null; }
+            if (dubAudioContext) { dubAudioContext.close(); dubAudioContext = null; }
+            video.src = '';
+            video.style.display = 'none';
+            placeholder.style.display = 'block';
+            placeholder.textContent = '⏺ 录制或加载视频 · 点击画面播放';
+            recordedChunks = [];
+            recordedBlob = null;
+            dubAudioChunks = [];
+            dubAudioBlob = null;
+            dubAudioBuffer = null;
+            videoDuration = 0;
+            clipStart = 0; clipEnd = 0;
+            clipRange.value = 0;
+            durationDisplay.textContent = '00:00 / 00:00';
+            startTimeLabel.textContent = '0.0s';
+            endTimeLabel.textContent = '0.0s';
+            recordBtn.textContent = '🔴 录屏';
+            pauseRecordBtn.disabled = true;
+            pauseRecordBtn.textContent = '⏸️';
+            exportBtn.disabled = false;
+            dubStatus.textContent = '无配音';
+            dubStatus.className = 'dub-status';
+            startDubBtn.disabled = false;
+            stopDubBtn.disabled = true;
+            playDubBtn.disabled = true;
+            dubClipRegion.style.display = 'none';
+            videoClipRegion.style.left = '0%';
+            videoClipRegion.style.right = '0%';
+            audioClipRegion.style.left = '0%';
+            audioClipRegion.style.right = '0%';
+            updatePlayhead(0);
+            progressSlider.value = 0;
+            timeDisplay.textContent = '00:00 / 00:00';
+        }
+
+        // ----- 录屏 -----
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { displaySurface: 'monitor' },
+                    audio: true,
+                });
+                if (!stream) return;
+                const mimeType = getSupportedMimeType() || 'video/webm';
+                mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+                recordedChunks = [];
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: mimeType });
+                    recordedBlob = blob;
+                    loadVideoIntoPlayer(blob);
+                    stream.getTracks().forEach(t => t.stop());
+                    recordBtn.textContent = '🔴 重新录屏';
+                    pauseRecordBtn.disabled = true;
+                    pauseRecordBtn.textContent = '⏸️';
+                    isRecording = false;
+                    isPaused = false;
+                };
+                mediaRecorder.start(1000);
+                isRecording = true;
+                isPaused = false;
+                recordBtn.textContent = '⏹️ 停止';
+                pauseRecordBtn.disabled = false;
+                pauseRecordBtn.textContent = '⏸️';
+                placeholder.style.display = 'block';
+                placeholder.textContent = '🟢 录制中… 点击「停止」结束';
+                video.style.display = 'none';
+            } catch (err) {
+                alert('无法启动录屏，请确认权限。');
+            }
+        }
+
+        // ----- 配音录制 -----
+        async function startDubRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                dubMediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                dubAudioChunks = [];
+                dubMediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) dubAudioChunks.push(e.data);
+                };
+                dubMediaRecorder.onstop = () => {
+                    const blob = new Blob(dubAudioChunks, { type: 'audio/webm' });
+                    dubAudioBlob = blob;
+                    if (dubAudioURL) URL.revokeObjectURL(dubAudioURL);
+                    dubAudioURL = URL.createObjectURL(blob);
+                    if (dubAudioContext) { dubAudioContext.close(); }
+                    dubAudioContext = new AudioContext();
+                    blob.arrayBuffer().then(buf => {
+                        dubAudioContext.decodeAudioData(buf, (buffer) => {
+                            dubAudioBuffer = buffer;
+                            dubClipRegion.style.display = 'flex';
+                            dubClipRegion.textContent = '🎙️ 配音 (' + buffer.duration.toFixed(1) + 's)';
+                            playDubBtn.disabled = false;
+                            dubStatus.textContent = '✅ 配音已录制';
+                            dubStatus.className = 'dub-status success';
+                            updateTracks();
+                        });
+                    });
+                    stream.getTracks().forEach(t => t.stop());
+                    isDubRecording = false;
+                    startDubBtn.disabled = false;
+                    stopDubBtn.disabled = true;
+                };
+                dubMediaRecorder.start();
+                isDubRecording = true;
+                startDubBtn.disabled = true;
+                stopDubBtn.disabled = false;
+                playDubBtn.disabled = true;
+                dubStatus.textContent = '🔴 录制中...';
+                dubStatus.className = 'dub-status recording';
+                dubClipRegion.style.display = 'flex';
+                dubClipRegion.textContent = '⏺ 录音中...';
+            } catch (err) {
+                alert('无法访问麦克风，请授权。');
+            }
+        }
+
+        function stopDubRecording() {
+            if (dubMediaRecorder && isDubRecording) {
+                dubMediaRecorder.stop();
+            }
+        }
+
+        function playDubAudio() {
+            if (!dubAudioBuffer) return;
+            if (!dubAudioContext) {
+                dubAudioContext = new AudioContext();
+            }
+            const source = dubAudioContext.createBufferSource();
+            source.buffer = dubAudioBuffer;
+            const gainNode = dubAudioContext.createGain();
+            gainNode.gain.value = parseFloat(dubVolume.value) / 100;
+            source.connect(gainNode);
+            gainNode.connect(dubAudioContext.destination);
+            source.start(0);
+        }
+
+        function handleDubFile(file) {
+            const blob = new Blob([file], { type: file.type });
+            dubAudioBlob = blob;
+            if (dubAudioURL) URL.revokeObjectURL(dubAudioURL);
+            dubAudioURL = URL.createObjectURL(blob);
+            if (dubAudioContext) { dubAudioContext.close(); }
+            dubAudioContext = new AudioContext();
+            blob.arrayBuffer().then(buf => {
+                dubAudioContext.decodeAudioData(buf, (buffer) => {
+                    dubAudioBuffer = buffer;
+                    dubClipRegion.style.display = 'flex';
+                    dubClipRegion.textContent = '🎙️ 配音 (' + buffer.duration.toFixed(1) + 's)';
+                    playDubBtn.disabled = false;
+                    dubStatus.textContent = '✅ 配音已上传';
+                    dubStatus.className = 'dub-status success';
+                    updateTracks();
+                });
+            });
+        }
+
+        // ----- 导出 (自动适配浏览器) -----
+        async function exportWithDub() {
+            if (!recordedBlob && !video.src) { alert('请先录制或加载视频。'); return; }
+            if (clipStart >= clipEnd || clipEnd - clipStart < 0.3) { alert('剪辑区间无效。'); return; }
+
+            let sourceBlob = recordedBlob;
+            if (!sourceBlob && video.src) {
+                try {
+                    const resp = await fetch(video.src);
+                    sourceBlob = await resp.blob();
+                } catch (e) { alert('无法读取视频数据。'); return; }
+            }
+            if (!sourceBlob) return;
+
+            exportBtn.disabled = true;
+            exportBtn.textContent = '⏳ 合成中…';
+
+            try {
+                const videoEl = document.createElement('video');
+                videoEl.muted = true;
+                videoEl.playsInline = true;
+                const url = URL.createObjectURL(sourceBlob);
+                videoEl.src = url;
+                await videoEl.load();
+                await new Promise(resolve => {
+                    if (videoEl.readyState >= 2) resolve();
+                    else videoEl.oncanplay = resolve;
+                });
+
+                const start = clipStart, end = clipEnd;
+                const duration = end - start;
+                if (duration <= 0) throw new Error('剪辑长度无效');
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 1280;
+                canvas.height = 720;
+                const ctx = canvas.getContext('2d');
+
+                const audioCtx = new AudioContext();
+                const dest = audioCtx.createMediaStreamDestination();
+
+                let dubSource = null;
+                let dubGainNode = null;
+                if (dubAudioBuffer) {
+                    dubSource = audioCtx.createBufferSource();
+                    dubSource.buffer = dubAudioBuffer;
+                    dubGainNode = audioCtx.createGain();
+                    dubGainNode.gain.value = parseFloat(dubVolume.value) / 100;
+                    dubSource.connect(dubGainNode);
+                    dubGainNode.connect(dest);
+                    const offset = parseFloat(dubOffset.value) || 0;
+                    dubSource.start(0, offset);
+                }
+
+                const stream = canvas.captureStream(30);
+                const combinedStream = new MediaStream();
+                stream.getVideoTracks().forEach(t => combinedStream.addTrack(t));
+                dest.stream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+
+                // 使用浏览器支持的 MIME 类型
+                const mimeType = SUPPORTED_MIME || 'video/webm';
+                const ext = getExportExtension();
+
+                const recorder = new MediaRecorder(combinedStream, {
+                    mimeType: mimeType,
+                    videoBitsPerSecond: 2500000,
+                });
+                const chunks = [];
+                recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+
+                recorder.start(100);
+                videoEl.currentTime = start;
+
+                let frameCount = 0;
+                const totalFrames = Math.floor(duration * 30);
+                await new Promise((resolve) => {
+                    const render = () => {
+                        if (videoEl.currentTime >= end || frameCount >= totalFrames) {
+                            recorder.stop();
+                            resolve();
+                            return;
+                        }
+                        if (videoEl.currentTime < start) videoEl.currentTime = start;
+                        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                        frameCount++;
+                        const nextTime = start + (frameCount / 30);
+                        if (nextTime < end) videoEl.currentTime = nextTime;
+                        else videoEl.currentTime = end;
+                        requestAnimationFrame(render);
+                    };
+                    render();
+                });
+
+                await new Promise(resolve => {
+                    recorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `多轨道_${Date.now()}.${ext}`;
+                        link.click();
+                        resolve();
+                    };
+                });
+
+                URL.revokeObjectURL(url);
+                audioCtx.close();
+
+            } catch (err) {
+                alert('导出失败: ' + err.message + '\n请尝试使用 Chrome 或 Edge 浏览器。');
+            }
+            exportBtn.textContent = '💾 导出';
+            exportBtn.disabled = false;
+        }
+
+        // ----- 播放控制 -----
+        let isPlaying = false;
+        let isMuted = false;
+
+        function togglePlay() {
+            if (!video.src) return;
+            if (video.paused) {
+                video.play().catch(() => {});
+                playPauseBtn.textContent = '⏸ 暂停';
+                isPlaying = true;
+            } else {
+                video.pause();
+                playPauseBtn.textContent = '▶ 播放';
+                isPlaying = false;
+            }
+        }
+
+        video.addEventListener('click', togglePlay);
+        playPauseBtn.addEventListener('click', togglePlay);
+
+        video.addEventListener('timeupdate', () => {
+            if (video.duration) {
+                const pct = (video.currentTime / video.duration) * 100;
+                progressSlider.value = pct;
+                updatePlayhead(video.currentTime);
+                timeDisplay.textContent = formatDuration(video.currentTime) + ' / ' + formatDuration(video.duration);
+            }
+        });
+
+        video.addEventListener('play', () => {
+            playPauseBtn.textContent = '⏸ 暂停';
+            isPlaying = true;
+        });
+        video.addEventListener('pause', () => {
+            playPauseBtn.textContent = '▶ 播放';
+            isPlaying = false;
+        });
+
+        progressSlider.addEventListener('input', function() {
+            if (!video.duration) return;
+            const pct = parseFloat(this.value) / 100;
+            video.currentTime = pct * video.duration;
+            updatePlayhead(video.currentTime);
+        });
+
+        muteBtn.addEventListener('click', () => {
+            video.muted = !video.muted;
+            isMuted = video.muted;
+            muteBtn.textContent = isMuted ? '🔇' : '🔊';
+        });
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlay();
+            }
+        });
+
+        // ----- 事件绑定 -----
+        recordBtn.addEventListener('click', () => {
+            if (isRecording) {
+                if (mediaRecorder) mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = '🔴 录屏';
+                pauseRecordBtn.disabled = true;
+                pauseRecordBtn.textContent = '⏸️';
+                return;
+            }
+            startRecording();
+        });
+
+        pauseRecordBtn.addEventListener('click', () => {
+            if (!mediaRecorder || !isRecording) return;
+            if (isPaused) {
+                mediaRecorder.resume();
+                pauseRecordBtn.textContent = '⏸️';
+                isPaused = false;
+            } else {
+                mediaRecorder.pause();
+                pauseRecordBtn.textContent = '▶️';
+                isPaused = true;
+            }
+        });
+
+        loadVideoBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            loadVideoIntoPlayer(new Blob([file], { type: file.type }));
+            fileInput.value = '';
+        });
+
+        resetBtn.addEventListener('click', resetAll);
+
+        clipRange.addEventListener('input', function() {
+            if (!videoDuration || videoDuration <= 0) return;
+            const percent = parseFloat(this.value) / 100;
+            let end = percent * videoDuration;
+            if (end - clipStart < 0.3) {
+                end = Math.min(clipStart + 0.3, videoDuration);
+                this.value = (end / videoDuration) * 100;
+            }
+            clipEnd = Math.min(end, videoDuration);
+            updateClipLabels();
+        });
+
+        applyClipBtn.addEventListener('click', () => {
+            if (!videoDuration || videoDuration <= 0) { alert('请先录制或加载视频。'); return; }
+            if (clipStart >= clipEnd || clipEnd - clipStart < 0.3) { alert('剪辑区间太短。'); return; }
+            video.currentTime = clipStart;
+            video.play().catch(() => {});
+        });
+
+        startDubBtn.addEventListener('click', startDubRecording);
+        stopDubBtn.addEventListener('click', stopDubRecording);
+        playDubBtn.addEventListener('click', playDubAudio);
+        uploadDubBtn.addEventListener('click', () => dubFileInput.click());
+        dubFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            handleDubFile(file);
+            dubFileInput.value = '';
+        });
+
+        dubVolume.addEventListener('input', function() {
+            dubVolumeLabel.textContent = parseInt(this.value) + '%';
+        });
+        dubOffset.addEventListener('input', function() {
+            dubOffsetLabel.textContent = parseFloat(this.value).toFixed(1) + 's';
+        });
+
+        exportBtn.addEventListener('click', exportWithDub);
+
+        // 初始化
+        resetAll();
+
+        // 显示支持的格式
+        console.log('✅ 浏览器支持的导出格式:', SUPPORTED_MIME || '未检测到');
+        if (!SUPPORTED_MIME) {
+            console.warn('⚠️ 建议使用 Chrome 或 Edge 浏览器');
+        }
+    })();
+</script>
+</body>
+</html>
