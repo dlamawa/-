@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>屏幕录制 · 带麦克风</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0b101a;
+            color: #e4e8ef;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .app {
+            max-width: 620px;
+            width: 100%;
+            background: #141c2a;
+            border-radius: 24px;
+            padding: 28px 24px 32px;
+            border: 1px solid #26303f;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .icon-big {
+            font-size: 3.6rem;
+            margin-bottom: 4px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .sub {
+            color: #6a7f99;
+            font-size: 0.8rem;
+            margin-bottom: 18px;
+        }
+
+        .preview-box {
+            background: #0a101c;
+            border-radius: 14px;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #1f2d40;
+            margin-bottom: 18px;
+            overflow: hidden;
+            position: relative;
+        }
+        .preview-box video {
+            width: 100%;
+            height: 100%;
+            display: none;
+            object-fit: contain;
+            background: #080c16;
+        }
+        .preview-box .empty {
+            color: #4a5a72;
+            font-size: 0.85rem;
+        }
+        .preview-box .rec-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(200, 30, 30, 0.9);
+            color: #fff;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            animation: pulse 1s infinite;
+        }
+        .preview-box .rec-badge .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #ff3333;
+            border-radius: 50%;
+            animation: blink 0.8s infinite;
+        }
+        .preview-box .mic-badge {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(30, 60, 200, 0.85);
+            color: #fff;
+            padding: 3px 12px;
+            border-radius: 16px;
+            font-size: 0.6rem;
+            font-weight: 500;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        }
+        .preview-box .mic-badge .dot-mic {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #66ccff;
+            border-radius: 50%;
+            animation: blink 0.6s infinite;
+        }
+
+        @keyframes blink {
+            0%,
+            100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+        @keyframes pulse {
+            0%,
+            100% { box-shadow: 0 0 0 0 rgba(200, 30, 30, 0.3); }
+            50% { box-shadow: 0 0 20px 4px rgba(200, 30, 30, 0.15); }
+        }
+
+        .btn {
+            border: none;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 10px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .btn-red {
+            background: #d94a4a;
+            color: #fff;
+        }
+        .btn-red:hover {
+            background: #c33a3a;
+        }
+        .btn-red.recording {
+            background: #8a2a2a;
+            animation: pulse 1s infinite;
+        }
+        .btn-green {
+            background: #1f9a6a;
+            color: #fff;
+        }
+        .btn-green:hover {
+            background: #178a5a;
+        }
+        .btn-outline {
+            background: transparent;
+            color: #d0dae8;
+            border: 1px solid #2f4057;
+        }
+        .btn-outline:hover {
+            background: #1a2335;
+        }
+        .btn-blue {
+            background: #3a78f0;
+            color: #fff;
+        }
+        .btn-blue:hover {
+            background: #2a68e0;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 4px;
+        }
+
+        /* 设置区 */
+        .settings {
+            background: #0f1724;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin: 14px 0 16px 0;
+            border: 1px solid #1a2538;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .settings label {
+            font-size: 0.75rem;
+            color: #8a9ab0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .settings input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #3a78f0;
+            cursor: pointer;
+        }
+        .settings select {
+            background: #0a121e;
+            color: #e4e8ef;
+            border: 1px solid #2f4057;
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            outline: none;
+            cursor: pointer;
+        }
+        .settings select:hover {
+            border-color: #4a6a8a;
+        }
+        .settings .hint {
+            font-size: 0.6rem;
+            color: #4a5a72;
+        }
+
+        /* 麦克风音量条 */
+        .mic-volume {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: #6a7f99;
+        }
+        .mic-volume .bar-track {
+            width: 60px;
+            height: 4px;
+            background: #1a2538;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .mic-volume .bar-track .bar-fill {
+            height: 100%;
+            width: 0%;
+            background: #5fcf9a;
+            border-radius: 4px;
+            transition: width 0.1s;
+        }
+        .mic-volume .bar-track .bar-fill.active {
+            background: #ff6b6b;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: #6a7f99;
+            padding: 10px 4px 0 4px;
+            border-top: 1px solid #1a2538;
+            margin-top: 14px;
+        }
+        .info-row .label {
+            color: #4a5a72;
+        }
+        .info-row .value {
+            color: #aab8d0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .status-msg {
+            font-size: 0.7rem;
+            color: #6a7f99;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+        .status-msg.rec {
+            color: #ff6b6b;
+        }
+        .status-msg.done {
+            color: #5fcf9a;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .badge-hd {
+            font-size: 0.55rem;
+            background: #2a6a4a;
+            color: #5fcf9a;
+            padding: 2px 10px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        @media (max-width: 500px) {
+            .app {
+                padding: 16px 14px 20px;
+            }
+            .btn {
+                font-size: 0.7rem;
+                padding: 8px 14px;
+            }
+            .icon-big {
+                font-size: 2.8rem;
+            }
+            h1 {
+                font-size: 1.1rem;
+            }
+            .settings {
+                flex-direction: column;
+                gap: 8px;
+                padding: 12px;
+            }
+            .mic-volume .bar-track {
+                width: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <div class="icon-big">🎙️</div>
+    <h1>屏幕录制 <span class="badge-hd">🎤 带麦克风</span></h1>
+    <p class="sub">录制屏幕 + 麦克风声音 · 高清画质</p>
+
+    <!-- 预览区 -->
+    <div class="preview-box" id="previewBox">
+        <video id="video" muted playsinline></video>
+        <div class="empty" id="emptyMsg">🎬 设置好选项后点击下方按钮</div>
+        <div class="rec-badge" id="recBadge">
+            <span class="dot"></span> 录制中
+        </div>
+        <div class="mic-badge" id="micBadge">
+            <span class="dot-mic"></span> 麦克风已开启
+        </div>
+    </div>
+
+    <!-- 设置区 -->
+    <div class="settings">
+        <label>
+            <input type="checkbox" id="micCheckbox" checked>
+            🎤 启用麦克风
+        </label>
+        <label>
+            <input type="checkbox" id="sysAudioCheckbox" checked>
+            🔊 系统声音
+        </label>
+        <label>
+            📹 画质
+            <select id="qualitySelect">
+                <option value="low">普通</option>
+                <option value="medium" selected>高清</option>
+                <option value="high">超清</option>
+                <option value="ultra">极致</option>
+            </select>
+        </label>
+        <label>
+            🎞️ 帧率
+            <select id="fpsSelect">
+                <option value="15">15</option>
+                <option value="24">24</option>
+                <option value="30" selected>30</option>
+                <option value="60">60</option>
+            </select>
+        </label>
+        <div class="mic-volume" id="micVolumeWrap">
+            🎙️
+            <div class="bar-track">
+                <div class="bar-fill" id="micLevelBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 按钮 -->
+    <div class="actions">
+        <button class="btn btn-red" id="btnRecord">🔴 开始录屏</button>
+        <button class="btn btn-green" id="btnDownload" disabled>💾 下载视频</button>
+        <button class="btn btn-outline" id="btnReset">↺ 重置</button>
+    </div>
+
+    <!-- 状态 -->
+    <div class="status-msg" id="statusMsg">就绪，点击"开始录屏"</div>
+
+    <!-- 信息 -->
+    <div class="info-row">
+        <span class="label">⏱️ 时长</span>
+        <span class="value" id="durationDisplay">00:00</span>
+        <span class="label">📦 大小</span>
+        <span class="value" id="sizeDisplay">--</span>
+        <span class="label">📐 分辨率</span>
+        <span class="value" id="resDisplay">--</span>
+    </div>
+
+</div>
+
+<script>
+    (function() {
+        "use strict";
+
+        // ===== DOM =====
+        const video = document.getElementById('video');
+        const emptyMsg = document.getElementById('emptyMsg');
+        const recBadge = document.getElementById('recBadge');
+        const micBadge = document.getElementById('micBadge');
+        const btnRecord = document.getElementById('btnRecord');
+        const btnDownload = document.getElementById('btnDownload');
+        const btnReset = document.getElementById('btnReset');
+        const statusMsg = document.getElementById('statusMsg');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const sizeDisplay = document.getElementById('sizeDisplay');
+        const resDisplay = document.getElementById('resDisplay');
+        const micCheckbox = document.getElementById('micCheckbox');
+        const sysAudioCheckbox = document.getElementById('sysAudioCheckbox');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const fpsSelect = document.getElementById('fpsSelect');
+        const micLevelBar = document.getElementById('micLevelBar');
+
+        // ===== state =====
+        let recorder = null;
+        let chunks = [];
+        let screenStream = null;
+        let micStream = null;
+        let combinedStream = null;
+        let isRecording = false;
+        let isStopping = false;
+        let recordedBlob = null;
+        let startTime = 0;
+        let timerInterval = null;
+        let videoURL = null;
+        let recordedWidth = 0;
+        let recordedHeight = 0;
+        let micAnalyser = null;
+        let micDataArray = null;
+        let micAnimFrame = null;
+
+        // ===== 码率配置 =====
+        function getBitrate() {
+            const map = { 'low': 2_000_000, 'medium': 5_000_000, 'high': 10_000_000, 'ultra': 20_000_000 };
+            return map[qualitySelect.value] || 5_000_000;
+        }
+
+        function getFps() { return parseInt(fpsSelect.value) || 30; }
+
+        function getQualityLabel() {
+            const map = { 'low': '普通', 'medium': '高清', 'high': '超清', 'ultra': '极致' };
+            return map[qualitySelect.value] || '高清';
+        }
+
+        // ===== helpers =====
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+
+        function resetUI() {
+            if (videoURL) { URL.revokeObjectURL(videoURL);
+                videoURL = null; }
+            video.src = '';
+            video.style.display = 'none';
+            emptyMsg.style.display = 'block';
+            emptyMsg.textContent = '🎬 设置好选项后点击下方按钮';
+            recBadge.style.display = 'none';
+            micBadge.style.display = 'none';
+            btnDownload.disabled = true;
+            durationDisplay.textContent = '00:00';
+            sizeDisplay.textContent = '--';
+            resDisplay.textContent = '--';
+            recordedBlob = null;
+            recordedWidth = 0;
+            recordedHeight = 0;
+            micLevelBar.style.width = '0%';
+            micLevelBar.className = 'bar-fill';
+            if (timerInterval) { clearInterval(timerInterval);
+                timerInterval = null; }
+            if (micAnimFrame) { cancelAnimationFrame(micAnimFrame);
+                micAnimFrame = null; }
+        }
+
+        // ===== 麦克风音量检测 =====
+        function setupMicVolume(stream) {
+            const ctx = new AudioContext();
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            micAnalyser = analyser;
+            micDataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            function updateLevel() {
+                if (!micAnalyser || !isRecording) {
+                    micAnimFrame = requestAnimationFrame(updateLevel);
+                    return;
+                }
+                micAnalyser.getByteFrequencyData(micDataArray);
+                let sum = 0;
+                for (let i = 0; i < micDataArray.length; i++) {
+                    sum += micDataArray[i];
+                }
+                const avg = sum / micDataArray.length;
+                const level = Math.min(100, (avg / 128) * 100);
+                micLevelBar.style.width = level + '%';
+                micLevelBar.className = 'bar-fill' + (level > 30 ? ' active' : '');
+                micAnimFrame = requestAnimationFrame(updateLevel);
+            }
+            updateLevel();
+        }
+
+        // ===== 录屏 =====
+        async function startRecording() {
+            if (isRecording || isStopping) return;
+
+            try {
+                // 1. 获取屏幕流
+                const screenStream_ = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        displaySurface: 'monitor',
+                        width: { ideal: 3840 },
+                        height: { ideal: 2160 },
+                        frameRate: { ideal: getFps() }
+                    },
+                    audio: sysAudioCheckbox.checked,
+                });
+                if (!screenStream_) return;
+                screenStream = screenStream_;
+
+                // 获取分辨率
+                const track = screenStream.getVideoTracks()[0];
+                if (track) {
+                    const settings = track.getSettings();
+                    recordedWidth = settings.width || 0;
+                    recordedHeight = settings.height || 0;
+                    resDisplay.textContent = (recordedWidth && recordedHeight) ?
+                        recordedWidth + '×' + recordedHeight :
+                        '--';
+                }
+
+                // 监听系统停止
+                const vt = screenStream.getVideoTracks()[0];
+                if (vt) {
+                    vt.addEventListener('ended', () => {
+                        if (isRecording) finishRecording();
+                    });
+                }
+
+                // 2. 麦克风流
+                let finalStream = screenStream;
+                let hasMic = false;
+
+                if (micCheckbox.checked) {
+                    try {
+                        micStream = await navigator.mediaDevices.getUserMedia({
+                            audio: {
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true,
+                            }
+                        });
+                        hasMic = true;
+                        // 显示麦克风指示器
+                        micBadge.style.display = 'flex';
+                        // 启动音量检测
+                        setupMicVolume(micStream);
+                    } catch (e) {
+                        console.warn('麦克风获取失败:', e);
+                        statusMsg.textContent = '⚠️ 麦克风获取失败，只录制屏幕声音';
+                        statusMsg.className = 'status-msg';
+                    }
+                }
+
+                // 3. 合并流
+                if (hasMic && micStream) {
+                    combinedStream = new MediaStream();
+                    // 视频轨
+                    screenStream.getVideoTracks().forEach(t => combinedStream.addTrack(t));
+                    // 屏幕音频轨
+                    screenStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+                    // 麦克风音频轨
+                    micStream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+                    finalStream = combinedStream;
+                } else {
+                    combinedStream = screenStream;
+                }
+
+                // 4. 创建录制器
+                const mimeTypes = [
+                    'video/webm;codecs=vp9,opus',
+                    'video/webm;codecs=vp8,opus',
+                    'video/webm;codecs=vp9',
+                    'video/webm;codecs=vp8',
+                    'video/webm',
+                ];
+                let mimeType = 'video/webm';
+                for (const mt of mimeTypes) {
+                    if (MediaRecorder.isTypeSupported(mt)) {
+                        mimeType = mt;
+                        break;
+                    }
+                }
+
+                const bitrate = getBitrate();
+                recorder = new MediaRecorder(finalStream, {
+                    mimeType: mimeType,
+                    videoBitsPerSecond: bitrate,
+                    audioBitsPerSecond: 128000,
+                });
+                chunks = [];
+
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+
+                recorder.onstop = () => {};
+
+                recorder.start(1000);
+                isRecording = true;
+                isStopping = false;
+                startTime = Date.now();
+
+                // UI更新
+                const qualityLabel = getQualityLabel();
+                const micLabel = hasMic ? '🎤+🔊' : '🔊';
+                btnRecord.textContent = '⏹️ 停止录制 (' + qualityLabel + ')';
+                btnRecord.className = 'btn btn-red recording';
+                recBadge.style.display = 'flex';
+                emptyMsg.style.display = 'block';
+                emptyMsg.textContent = '🟢 正在录制 ' + micLabel + ' (' + qualityLabel + ' · ' + getFps() + 'fps)';
+                video.style.display = 'none';
+                statusMsg.textContent = '🔴 录制中 ' + micLabel + ' (' + qualityLabel + ' ' + getFps() + 'fps) ... 点击停止';
+                statusMsg.className = 'status-msg rec';
+                btnDownload.disabled = true;
+
+                // 计时器
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    durationDisplay.textContent = formatTime(elapsed);
+                }, 200);
+
+                // 强制收集数据
+                const dataTimer = setInterval(() => {
+                    if (isRecording && recorder && recorder.state === 'recording') {
+                        try { recorder.requestData(); } catch (_) {}
+                    }
+                }, 500);
+                recorder._dataTimer = dataTimer;
+
+                console.log('✅ 录屏已启动，麦克风:', hasMic, '码率:', bitrate / 1000000, 'Mbps');
+
+            } catch (err) {
+                alert('录屏启动失败: ' + err.message);
+                resetAll();
+            }
+        }
+
+        function finishRecording() {
+            if (isStopping) return;
+            isStopping = true;
+
+            if (timerInterval) { clearInterval(timerInterval);
+                timerInterval = null; }
+            if (micAnimFrame) { cancelAnimationFrame(micAnimFrame);
+                micAnimFrame = null; }
+
+            if (recorder && recorder.state !== 'inactive') {
+                try { recorder.requestData(); } catch (_) {}
+                setTimeout(() => { try { recorder.stop(); } catch (_) {} }, 80);
+            }
+            if (recorder && recorder._dataTimer) {
+                clearInterval(recorder._dataTimer);
+                recorder._dataTimer = null;
+            }
+
+            // 停止所有流
+            if (screenStream) {
+                screenStream.getTracks().forEach(t => { try { t.stop();
+                        t.enabled = false; } catch (_) {} });
+                screenStream = null;
+            }
+            if (micStream) {
+                micStream.getTracks().forEach(t => { try { t.stop();
+                        t.enabled = false; } catch (_) {} });
+                micStream = null;
+            }
+            if (combinedStream && combinedStream !== screenStream) {
+                combinedStream.getTracks().forEach(t => { try { t.stop();
+                        t.enabled = false; } catch (_) {} });
+                combinedStream = null;
+            }
+
+            setTimeout(() => { processRecordedData(); }, 300);
+        }
+
+        function processRecordedData() {
+            if (chunks.length > 0) {
+                const mime = recorder?.mimeType || 'video/webm';
+                const blob = new Blob(chunks, { type: mime });
+                if (blob.size > 0) {
+                    recordedBlob = blob;
+                    if (videoURL) URL.revokeObjectURL(videoURL);
+                    videoURL = URL.createObjectURL(blob);
+                    video.src = videoURL;
+                    video.style.display = 'block';
+                    emptyMsg.style.display = 'none';
+                    recBadge.style.display = 'none';
+                    micBadge.style.display = 'none';
+                    micLevelBar.style.width = '0%';
+
+                    const duration = (Date.now() - startTime) / 1000;
+                    durationDisplay.textContent = formatTime(duration);
+                    sizeDisplay.textContent = formatSize(blob.size);
+
+                    btnDownload.disabled = false;
+                    const qualityLabel = getQualityLabel();
+                    statusMsg.textContent = '✅ 录制完成！(' + qualityLabel + ' · ' + formatSize(blob.size) + ') 点击下载';
+                    statusMsg.className = 'status-msg done';
+
+                    btnRecord.textContent = '🔴 开始录屏';
+                    btnRecord.className = 'btn btn-red';
+                    isRecording = false;
+                    isStopping = false;
+
+                    video.play().catch(() => {});
+                    console.log('✅ 录制完成，大小:', formatSize(blob.size));
+                    return;
+                }
+            }
+
+            // 无数据重试
+            if (chunks.length === 0) {
+                setTimeout(() => {
+                    if (chunks.length > 0) {
+                        const mime = recorder?.mimeType || 'video/webm';
+                        const blob = new Blob(chunks, { type: mime });
+                        if (blob.size > 0) {
+                            recordedBlob = blob;
+                            if (videoURL) URL.revokeObjectURL(videoURL);
+                            videoURL = URL.createObjectURL(blob);
+                            video.src = videoURL;
+                            video.style.display = 'block';
+                            emptyMsg.style.display = 'none';
+                            recBadge.style.display = 'none';
+                            micBadge.style.display = 'none';
+                            const duration = (Date.now() - startTime) / 1000;
+                            durationDisplay.textContent = formatTime(duration);
+                            sizeDisplay.textContent = formatSize(blob.size);
+                            btnDownload.disabled = false;
+                            statusMsg.textContent = '✅ 录制完成！点击下载';
+                            statusMsg.className = 'status-msg done';
+                            btnRecord.textContent = '🔴 开始录屏';
+                            btnRecord.className = 'btn btn-red';
+                            isRecording = false;
+                            isStopping = false;
+                            video.play().catch(() => {});
+                            return;
+                        }
+                    }
+                    statusMsg.textContent = '⚠️ 录制数据为空，请重试';
+                    statusMsg.className = 'status-msg';
+                    btnRecord.textContent = '🔴 开始录屏';
+                    btnRecord.className = 'btn btn-red';
+                    isRecording = false;
+                    isStopping = false;
+                    recBadge.style.display = 'none';
+                    micBadge.style.display = 'none';
+                }, 600);
+            } else {
+                btnRecord.textContent = '🔴 开始录屏';
+                btnRecord.className = 'btn btn-red';
+                isRecording = false;
+                isStopping = false;
+                recBadge.style.display = 'none';
+                micBadge.style.display = 'none';
+                statusMsg.textContent = '⚠️ 数据处理失败，请重试';
+                statusMsg.className = 'status-msg';
+            }
+        }
+
+        function stopRecording() {
+            if (isStopping) return;
+            if (!isRecording) { resetAll(); return; }
+            finishRecording();
+        }
+
+        // ===== 下载 =====
+        function downloadVideo() {
+            if (!recordedBlob) { statusMsg.textContent = '⚠️ 没有可下载的视频'; return; }
+            const mime = recordedBlob.type || 'video/webm';
+            let ext = 'webm';
+            if (mime.includes('mp4')) ext = 'mp4';
+
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') +
+                '-' + String(now.getDate()).padStart(2, '0') + '_' +
+                String(now.getHours()).padStart(2, '0') + '-' +
+                String(now.getMinutes()).padStart(2, '0') + '-' +
+                String(now.getSeconds()).padStart(2, '0');
+            const fileName = '录屏_' + getQualityLabel() + '_' + dateStr + '.' + ext;
+
+            if (window.showSaveFilePicker) {
+                try {
+                    window.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: [{ description: '视频文件', accept: { 'video/*': ['.' + ext] } }],
+                    }).then(async (handle) => {
+                        const writable = await handle.createWritable();
+                        await writable.write(recordedBlob);
+                        await writable.close();
+                        statusMsg.textContent = '✅ 已保存到: ' + handle.name;
+                        statusMsg.className = 'status-msg done';
+                    }).catch((err) => {
+                        if (err.name === 'AbortError' || err.name === 'SecurityError') {
+                            statusMsg.textContent = 'ℹ️ 已取消保存';
+                            statusMsg.className = 'status-msg';
+                            return;
+                        }
+                        fallbackDownload(fileName);
+                    });
+                    return;
+                } catch (_) { fallbackDownload(fileName); }
+            } else {
+                fallbackDownload(fileName);
+            }
+        }
+
+        function fallbackDownload(fileName) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(recordedBlob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => { URL.revokeObjectURL(link.href); }, 5000);
+            statusMsg.textContent = '✅ 已下载: ' + fileName;
+            statusMsg.className = 'status-msg done';
+        }
+
+        // ===== 重置 =====
+        function resetAll() {
+            if (isRecording) {
+                if (recorder && recorder.state === 'recording') { try { recorder.stop(); } catch (_) {} }
+                if (screenStream) { screenStream.getTracks().forEach(t => { try { t.stop();
+                            t.enabled = false; } catch (_) {} });
+                    screenStream = null; }
+                if (micStream) { micStream.getTracks().forEach(t => { try { t.stop();
+                            t.enabled = false; } catch (_) {} });
+                    micStream = null; }
+                if (combinedStream && combinedStream !== screenStream) {
+                    combinedStream.getTracks().forEach(t => { try { t.stop();
+                            t.enabled = false; } catch (_) {} });
+                    combinedStream = null;
+                }
+                if (recorder && recorder._dataTimer) { clearInterval(recorder._dataTimer);
+                    recorder._dataTimer = null; }
+                isRecording = false;
+                isStopping = false;
+                btnRecord.textContent = '🔴 开始录屏';
+                btnRecord.className = 'btn btn-red';
+                recBadge.style.display = 'none';
+                micBadge.style.display = 'none';
+                micLevelBar.style.width = '0%';
+                if (timerInterval) { clearInterval(timerInterval);
+                    timerInterval = null; }
+                if (micAnimFrame) { cancelAnimationFrame(micAnimFrame);
+                    micAnimFrame = null; }
+            }
+            resetUI();
+            statusMsg.textContent = '🔄 已重置，点击"开始录屏"';
+            statusMsg.className = 'status-msg';
+            btnRecord.textContent = '🔴 开始录屏';
+            btnRecord.className = 'btn btn-red';
+            recordedBlob = null;
+            chunks = [];
+            recorder = null;
+            recordedWidth = 0;
+            recordedHeight = 0;
+            resDisplay.textContent = '--';
+        }
+
+        // ===== events =====
+        btnRecord.addEventListener('click', () => {
+            if (isRecording) { stopRecording(); return; }
+            startRecording();
+        });
+
+        btnDownload.addEventListener('click', downloadVideo);
+        btnReset.addEventListener('click', resetAll);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.code === 'Space') { e.preventDefault(); if (isRecording) stopRecording();
+                else startRecording(); }
+            if (e.code === 'KeyD' && !btnDownload.disabled) downloadVideo();
+        });
+
+        // ===== 初始化 =====
+        resetUI();
+        statusMsg.textContent = '🟢 就绪，勾选"启用麦克风"可录制人声';
+        statusMsg.className = 'status-msg';
+
+        console.log('✅ 录屏工具已启动 (带麦克风)');
+        console.log('💡 空格键 = 开始/停止录制');
+        console.log('💡 D键 = 下载视频');
+        console.log('💡 勾选"启用麦克风"可同步录制人声');
+    })();
+</script>
+</body>
+</html>
