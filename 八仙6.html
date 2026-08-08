@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>八仙 · 现代观影器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0b0a0c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-image: radial-gradient(circle at 20% 30%, #1e2a3a 0%, #08080a 90%);
+        }
+        .player-container {
+            width: 95%;
+            max-width: 1000px;
+            background: rgba(20, 18, 30, 0.75);
+            backdrop-filter: blur(4px);
+            border-radius: 32px;
+            padding: 20px 20px 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 2px #3a3a4e inset, 0 0 0 4px #1e1e2a inset;
+            border: 1px solid #6a6a8a;
+            position: relative;
+        }
+        .player-container::before {
+            content: "🎬 八仙 · 弹幕影院";
+            position: absolute;
+            top: -14px;
+            left: 30px;
+            background: #1a1a2e;
+            color: #e8e8f0;
+            padding: 4px 24px;
+            border-radius: 40px;
+            font-size: 18px;
+            letter-spacing: 2px;
+            border: 1px solid #6a6a8a;
+            box-shadow: 0 0 20px rgba(100, 100, 200, 0.2);
+            font-weight: 600;
+        }
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid #4a4a5e;
+            box-shadow: 0 0 40px rgba(60, 60, 120, 0.2);
+        }
+        #videoPlayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #0f0d12;
+        }
+        #danmakuCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 12px 20px;
+            margin-top: 20px;
+            padding: 10px 16px;
+            background: rgba(10, 8, 15, 0.7);
+            border-radius: 60px;
+            border: 1px solid #4a4a5e;
+            backdrop-filter: blur(4px);
+        }
+        .controls button {
+            background: #2a2a3e;
+            border: none;
+            color: #e8e8f0;
+            padding: 6px 18px;
+            border-radius: 40px;
+            font-size: 16px;
+            font-family: inherit;
+            border: 1px solid #5a5a7a;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+        .controls button:hover {
+            background: #4a4a6a;
+            color: #ffffff;
+            border-color: #8a8aca;
+            transform: scale(1.02);
+            box-shadow: 0 0 25px rgba(100, 100, 200, 0.3);
+        }
+        .controls input[type="range"] {
+            flex: 1;
+            min-width: 100px;
+            accent-color: #7a7aaa;
+            background: #2a2a3e;
+            height: 4px;
+            border-radius: 10px;
+        }
+        .time-display {
+            color: #c8c8d8;
+            font-size: 15px;
+            min-width: 110px;
+            text-align: center;
+            letter-spacing: 1px;
+            background: #1a1a2e;
+            padding: 4px 12px;
+            border-radius: 30px;
+            border: 1px solid #3a3a5e;
+            font-weight: 400;
+        }
+        .danmaku-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #c8c8d8;
+            font-size: 15px;
+        }
+        .danmaku-toggle input {
+            width: 18px;
+            height: 18px;
+            accent-color: #7a7aaa;
+        }
+        .loading-tip {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #b8b8d0;
+            font-size: 18px;
+            z-index: 5;
+            background: rgba(0,0,0,0.7);
+            padding: 12px 30px;
+            border-radius: 40px;
+            border: 1px solid #4a4a6a;
+            letter-spacing: 2px;
+            pointer-events: none;
+            display: none;
+            font-weight: 300;
+        }
+        .loading-tip.show {
+            display: block;
+        }
+        .player-container.fullscreen {
+            max-width: 100%;
+            width: 100%;
+            height: 100vh;
+            border-radius: 0;
+            padding: 10px 10px 16px;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: none;
+            border: none;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .player-container.fullscreen .video-wrapper {
+            flex: 1;
+            padding-bottom: 0;
+            height: calc(100vh - 100px);
+            border-radius: 12px;
+        }
+        .player-container.fullscreen .controls {
+            margin-top: 12px;
+            border-radius: 40px;
+        }
+        .player-container.fullscreen::before {
+            display: none;
+        }
+        @media (max-width: 600px) {
+            .player-container { padding: 12px; }
+            .controls { gap: 8px; }
+            .controls button { font-size: 14px; padding: 4px 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="player-container" id="playerContainer">
+    <div class="video-wrapper">
+        <video id="videoPlayer" controls playsinline></video>
+        <canvas id="danmakuCanvas"></canvas>
+        <div class="loading-tip" id="loadingTip">⏳ 加载中 ...</div>
+    </div>
+
+    <div class="controls">
+        <button id="playBtn">▶ 播放</button>
+        <input type="range" id="progressBar" value="0" step="0.01">
+        <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
+        <button id="danmakuBtn">💬 发弹幕</button>
+        <button id="fullscreenBtn">⛶ 全屏</button>
+        <div class="danmaku-toggle">
+            <label for="danmakuSwitch">弹幕</label>
+            <input type="checkbox" id="danmakuSwitch" checked>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17/dist/hls.min.js"></script>
+
+<script>
+    (function() {
+        const container = document.getElementById('playerContainer');
+        const video = document.getElementById('videoPlayer');
+        const canvas = document.getElementById('danmakuCanvas');
+        const ctx = canvas.getContext('2d');
+        const playBtn = document.getElementById('playBtn');
+        const progressBar = document.getElementById('progressBar');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const danmakuBtn = document.getElementById('danmakuBtn');
+        const danmakuSwitch = document.getElementById('danmakuSwitch');
+        const loadingTip = document.getElementById('loadingTip');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+        const VIDEO_URL = 'https://vip.ffzy-play9.com/20260723/45145_51edcfc8/index.m3u8';
+
+        let hls = null;
+
+        function initHLS() {
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = VIDEO_URL;
+                video.addEventListener('loadedmetadata', function() {
+                    video.play().catch(e => console.log('自动播放被阻止'));
+                });
+                return;
+            }
+            if (Hls && Hls.isSupported()) {
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    maxBufferLength: 30,
+                });
+                hls.loadSource(VIDEO_URL);
+                hls.attachMedia(video);
+                loadingTip.classList.add('show');
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    loadingTip.classList.remove('show');
+                    video.play().catch(e => console.log('自动播放被阻止'));
+                });
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        console.error('HLS 发生致命错误:', data);
+                        loadingTip.textContent = '⚠️ 加载失败，请刷新重试';
+                    }
+                });
+            } else {
+                loadingTip.textContent = '❌ 您的浏览器不支持 HLS 播放';
+                console.error('HLS is not supported in this browser.');
+            }
+        }
+
+        initHLS();
+
+        // ============================================================
+        //  🎨 弹幕系统 - 笔画更细 + 速度适中 + 位置靠上
+        // ============================================================
+        const DANMAKU_CONFIG = {
+            maxCount: 120,
+            speed: 0.7,
+            fontSize: 22,
+            colorPalette: [
+                '#FF6B6B', '#FF9F43', '#FECA57', '#48DBFB', '#0ABDE3',
+                '#1DD1A1', '#10AC84', '#A29BFE', '#6C5CE7', '#FD79A8',
+                '#F368E0', '#00D2D3', '#FFC048', '#FF6B81',
+            ]
+        };
+
+        let danmakuList = [];
+        const AI_DANMAKU_POOL = [
+            "来了来了！", "前排围观", "沙发", "哈哈哈", "笑死我了", 
+            "绝了！", "牛批！", "666", "可以可以", "好家伙",
+            "有点东西", "我直呼好家伙", "泪目了", "燃起来了！",
+            "太帅了吧", "awsl", "yyds", "神仙颜值", "爱了爱了",
+            "这波操作满分", "导演懂我", "编剧出来挨打", "经费在燃烧",
+            "细节拉满", "彩蛋！", "二刷走起", "打卡", "已收藏",
+            "感动到哭", "笑出腹肌", "太甜了吧", "好虐啊", "血压上来了",
+            "爽！", "过瘾", "根本不够看", "什么时候更新", "再来一遍",
+            "我酸了", "慕了慕了", "就这？", "你细品", "懂的都懂",
+            "有内味了", "破防了", "DNA动了", "入坑了", "上头了",
+        ];
+
+        let animationId = null;
+        let isDanmakuOn = true;
+
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            const rect = wrapper.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            danmakuList.forEach(d => {
+                d.x = (d.x / (canvas.width || 1)) * canvas.width;
+                d.y = (d.y / (canvas.height || 1)) * canvas.height;
+            });
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function generateAIDanmaku() {
+            if (!isDanmakuOn) return null;
+            const text = AI_DANMAKU_POOL[Math.floor(Math.random() * AI_DANMAKU_POOL.length)];
+            const fontSize = DANMAKU_CONFIG.fontSize + Math.floor(Math.random() * 6) - 2;
+            const color = DANMAKU_CONFIG.colorPalette[Math.floor(Math.random() * DANMAKU_CONFIG.colorPalette.length)];
+            // 弹幕位置：靠上区域 5%~30%
+            const y = canvas.height * (0.05 + Math.random() * 0.25);
+            const baseSpeed = (canvas.width / 200) * DANMAKU_CONFIG.speed + 0.4;
+            const speed = (baseSpeed + Math.random() * 0.8) * (0.8 + Math.random() * 0.4);
+            const opacity = 0.80 + Math.random() * 0.20;
+            return { text, x: canvas.width + 30, y, speed, color, fontSize, opacity };
+        }
+
+        function addDanmaku(danmaku) {
+            if (!danmaku) return;
+            while (danmakuList.length >= DANMAKU_CONFIG.maxCount) {
+                danmakuList.shift();
+            }
+            danmakuList.push(danmaku);
+        }
+
+        function aiSendDanmaku() {
+            if (!isDanmakuOn) return;
+            if (Math.random() < 0.12) {
+                const newDanmaku = generateAIDanmaku();
+                if (newDanmaku) addDanmaku(newDanmaku);
+            }
+            if (Math.random() < 0.02) {
+                for (let i = 0; i < 2; i++) {
+                    const d = generateAIDanmaku();
+                    if (d) addDanmaku(d);
+                }
+            }
+        }
+
+        function sendManualDanmaku() {
+            if (!isDanmakuOn) {
+                alert('请先开启弹幕开关');
+                return;
+            }
+            const text = AI_DANMAKU_POOL[Math.floor(Math.random() * AI_DANMAKU_POOL.length)];
+            const color = DANMAKU_CONFIG.colorPalette[Math.floor(Math.random() * DANMAKU_CONFIG.colorPalette.length)];
+            const fontSize = DANMAKU_CONFIG.fontSize + 4;
+            const y = canvas.height * (0.05 + Math.random() * 0.25);
+            const speed = (canvas.width / 180) * DANMAKU_CONFIG.speed + 0.6;
+            addDanmaku({ text, x: canvas.width + 20, y, speed, color, fontSize, opacity: 0.95 });
+            setTimeout(() => {
+                if (isDanmakuOn) {
+                    const d2 = generateAIDanmaku();
+                    if (d2) addDanmaku(d2);
+                }
+            }, 200);
+        }
+
+        // --- 🆕 绘制弹幕（笔画更细）---
+        function updateDanmaku() {
+            if (!isDanmakuOn) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+            for (let i = danmakuList.length - 1; i >= 0; i--) {
+                const d = danmakuList[i];
+                d.x -= d.speed;
+                if (d.x + d.fontSize * 2 < -40) {
+                    danmakuList.splice(i, 1);
+                }
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (const d of danmakuList) {
+                // 【改动1】字体粗细从 700（粗体）改为 400（常规），笔画变细
+                ctx.font = `400 ${d.fontSize}px -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                
+                // 发光效果
+                ctx.shadowColor = d.color + '50';
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                
+                // 主文字
+                ctx.globalAlpha = d.opacity || 0.9;
+                ctx.fillStyle = d.color;
+                ctx.fillText(d.text, d.x, d.y);
+                
+                // 【改动2】描边宽度从 4 减小到 2，更细更精致
+                ctx.shadowBlur = 0;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+                ctx.strokeText(d.text, d.x, d.y);
+                
+                // 【改动3】二次细描边宽度从 1.5 减小到 0.8
+                ctx.lineWidth = 0.8;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                ctx.strokeText(d.text, d.x + 0.5, d.y - 0.5);
+            }
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1.0;
+        }
+
+        function animate() {
+            aiSendDanmaku();
+            updateDanmaku();
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // --- 视频控制 ---
+        playBtn.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+                playBtn.textContent = '⏸ 暂停';
+            } else {
+                video.pause();
+                playBtn.textContent = '▶ 播放';
+            }
+        });
+
+        video.addEventListener('play', () => {
+            playBtn.textContent = '⏸ 暂停';
+        });
+        video.addEventListener('pause', () => {
+            playBtn.textContent = '▶ 播放';
+        });
+
+        video.addEventListener('timeupdate', () => {
+            const percent = (video.currentTime / video.duration) * 100;
+            progressBar.value = percent || 0;
+            const cur = formatTime(video.currentTime);
+            const dur = formatTime(video.duration);
+            timeDisplay.textContent = `${cur} / ${dur}`;
+        });
+
+        progressBar.addEventListener('input', (e) => {
+            const time = (e.target.value / 100) * video.duration;
+            video.currentTime = time;
+        });
+
+        function formatTime(seconds) {
+            if (!seconds || isNaN(seconds)) return '00:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        danmakuSwitch.addEventListener('change', (e) => {
+            isDanmakuOn = e.target.checked;
+            if (!isDanmakuOn) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+        danmakuBtn.addEventListener('click', sendManualDanmaku);
+
+        // --- 全屏功能 ---
+        let isFullscreen = false;
+
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        function toggleFullscreen() {
+            if (!isFullscreen) {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen().then(() => {
+                        isFullscreen = true;
+                        fullscreenBtn.textContent = '⛶ 退出';
+                        setTimeout(resizeCanvas, 100);
+                    }).catch(() => {
+                        fallbackFullscreen();
+                    });
+                } else {
+                    fallbackFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().then(() => {
+                        isFullscreen = false;
+                        fullscreenBtn.textContent = '⛶ 全屏';
+                        setTimeout(resizeCanvas, 100);
+                    }).catch(() => {
+                        exitFallbackFullscreen();
+                    });
+                } else {
+                    exitFallbackFullscreen();
+                }
+            }
+        }
+
+        function fallbackFullscreen() {
+            container.classList.add('fullscreen');
+            isFullscreen = true;
+            fullscreenBtn.textContent = '⛶ 退出';
+            setTimeout(resizeCanvas, 100);
+        }
+
+        function exitFallbackFullscreen() {
+            container.classList.remove('fullscreen');
+            isFullscreen = false;
+            fullscreenBtn.textContent = '⛶ 全屏';
+            setTimeout(resizeCanvas, 100);
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                isFullscreen = false;
+                fullscreenBtn.textContent = '⛶ 全屏';
+                container.classList.remove('fullscreen');
+                setTimeout(resizeCanvas, 100);
+            }
+        });
+
+        // --- 初始化 ---
+        function initDanmaku() {
+            resizeCanvas();
+            for (let i = 0; i < 18; i++) {
+                const d = generateAIDanmaku();
+                if (d) {
+                    d.x = canvas.width * (0.05 + Math.random() * 0.65);
+                    d.y = canvas.height * (0.05 + Math.random() * 0.25);
+                    danmakuList.push(d);
+                }
+            }
+            if (animationId) cancelAnimationFrame(animationId);
+            animate();
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(initDanmaku, 300);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (animationId) cancelAnimationFrame(animationId);
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+        });
+
+        window.__video = video;
+    })();
+</script>
+</body>
+</html>
